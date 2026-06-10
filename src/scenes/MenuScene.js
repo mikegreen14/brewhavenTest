@@ -12,7 +12,7 @@ class MenuScene extends Phaser.Scene {
     // Ensure canvas bounds are correct after DOM layout settles.
     this.scale.updateBounds();
 
-    const W = 800, H = 600;
+    const W = window.GAME_WIDTH || 800, H = 600;
 
     // ── Background: plaster wall gradient (same colours as GameScene default) ──
     const bg = this.add.graphics();
@@ -35,11 +35,11 @@ class MenuScene extends Phaser.Scene {
     // ── Decorative machines flanking the layout ──
     this.add.image(96,  378, 'softshadow').setScale(1.7, 0.38).setAlpha(0.28);
     this.add.image(96,  378, 'machine').setOrigin(0.5, 1).setScale(6).setAlpha(0.42).setDepth(1);
-    this.add.image(704, 378, 'softshadow').setScale(1.7, 0.38).setAlpha(0.28);
-    this.add.image(704, 378, 'dripper').setOrigin(0.5, 1).setScale(6).setAlpha(0.42).setDepth(1);
+    this.add.image(W - 96, 378, 'softshadow').setScale(1.7, 0.38).setAlpha(0.28);
+    this.add.image(W - 96, 378, 'dripper').setOrigin(0.5, 1).setScale(6).setAlpha(0.42).setDepth(1);
     // Cool light from the window side, warm glow over the machines
     this.add.image(96,  280, 'glow').setDisplaySize(220, 220).setTint(0xffd6a0).setAlpha(0.22).setBlendMode(Phaser.BlendModes.ADD).setDepth(1);
-    this.add.image(704, 280, 'glow').setDisplaySize(220, 220).setTint(0xbfe0ff).setAlpha(0.22).setBlendMode(Phaser.BlendModes.ADD).setDepth(1);
+    this.add.image(W - 96, 280, 'glow').setDisplaySize(220, 220).setTint(0xbfe0ff).setAlpha(0.22).setBlendMode(Phaser.BlendModes.ADD).setDepth(1);
 
     // ── Title ──
     // Render the word separately so setOrigin(0.5) centres on the letters only,

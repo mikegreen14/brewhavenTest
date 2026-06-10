@@ -5,7 +5,7 @@
 const config = {
   type: Phaser.AUTO,
   parent: 'game',
-  width: 800,
+  width: window.GAME_WIDTH || 800,
   height: 600,
   pixelArt: true,
   roundPixels: true,

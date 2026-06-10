@@ -23,7 +23,7 @@
  */
 
 // ---- World layout ----------------------------------------------------------
-const GW = 800, GH = 600;
+const GW = window.GAME_WIDTH || 800, GH = 600;
 const WALL_BOTTOM = 300;
 const COUNTER_TOP = 300, COUNTER_BOTTOM = 348;
 

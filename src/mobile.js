@@ -18,3 +18,14 @@ function setViewportHeight() {
 setViewportHeight();
 window.addEventListener('resize', setViewportHeight);
 window.addEventListener('orientationchange', setViewportHeight);
+
+// On mobile we play in forced landscape, so use the device's long/short side
+// ratio (stable regardless of current orientation) to pick a wider logical
+// canvas than the desktop 800x600 — this lets Phaser's FIT mode fill a wide
+// phone screen edge-to-edge instead of leaving big side bars.
+const longSide = Math.max(window.innerWidth, window.innerHeight);
+const shortSide = Math.min(window.innerWidth, window.innerHeight);
+const landscapeAspect = longSide / shortSide;
+window.GAME_WIDTH = MOBILE_MODE
+  ? Math.round(Math.min(1200, Math.max(800, 600 * landscapeAspect)))
+  : 800;
