@@ -13,7 +13,10 @@ const config = {
   scene: [BootScene, MenuScene, GameScene],
   scale: {
     mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
+    // #game already centers the canvas via flexbox; Phaser's own
+    // autoCenter would add a second margin-based offset on top of that
+    // and push the canvas off-center.
+    autoCenter: Phaser.Scale.NO_CENTER,
   },
 };
 
