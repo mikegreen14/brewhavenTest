@@ -17,10 +17,30 @@
     #game {
       width: 100vw;
       height: 100vh;
+      height: calc(var(--vh, 1vh) * 100);
       display: flex;
       align-items: center;
       justify-content: center;
       touch-action: none;
+    }
+    /* Fullscreen toggle, shown on small viewports only. */
+    #fullscreen-btn {
+      display: none;
+      position: fixed;
+      top: 8px;
+      right: 8px;
+      z-index: 500;
+      width: 40px;
+      height: 40px;
+      border: none;
+      border-radius: 8px;
+      background: rgba(27, 22, 32, 0.6);
+      color: #e9e2d4;
+      font-size: 20px;
+      line-height: 40px;
+      text-align: center;
+      padding: 0;
+      cursor: pointer;
     }
     /* Keep the pixels crunchy when the canvas is scaled by the browser. */
     canvas {
@@ -68,6 +88,7 @@
 </head>
 <body>
   <div id="game"></div>
+  <button id="fullscreen-btn" title="Toggle fullscreen">⛶</button>
   <div id="hint">A/D or ←/→ to move • click a station (or hold SPACE) to pour • bubble border = which station next • stop in the bright green zone • some drinks need a milk top-up at a second station • don't lose all 3 hearts!</div>
   <div id="rotate-overlay">
     <span class="icon">📱</span>
@@ -95,6 +116,22 @@
       document.getElementById('hint').textContent =
         'Tap a station to walk there • tap & hold to pour • release in the bright green zone • '
         + 'some drinks need a milk top-up at a second station • don\'t lose all 3 hearts!';
+    }
+
+    // Fullscreen toggle: handy on mobile to hide the browser chrome.
+    const fullscreenBtn = document.getElementById('fullscreen-btn');
+    if (MOBILE_MODE && document.documentElement.requestFullscreen) {
+      fullscreenBtn.style.display = 'block';
+      fullscreenBtn.addEventListener('click', () => {
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      });
+      document.addEventListener('fullscreenchange', () => {
+        fullscreenBtn.textContent = document.fullscreenElement ? '✕' : '⛶';
+      });
     }
 
     const rotateOverlay = document.getElementById('rotate-overlay');
