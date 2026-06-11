@@ -17,6 +17,7 @@ const Save = (() => {
     shopName: '',
     baristaName: '',
     apronColor: 'teal',
+    seenTutorials: [],
   };
 
   let available = false;

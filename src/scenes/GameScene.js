@@ -92,6 +92,12 @@ const EMPLOYEE_WAGE_BASE = 6;
 const EMPLOYEE_WAGE_PER_LEVEL = 0.6;
 const EMPLOYEE_POUR_UPGRADE = { baseCost: 90, rate: 1.6, amt: 0.06 };
 
+// ---- Per-machine Store upgrades (Pour Speed / Steady Hands) ----------------
+const STATION_UPGRADES = {
+  pour: { title: 'Faster Pour',  icon: '⚡', baseCost: 40, rate: 1.55, amt: 0.07 },
+  tol:  { title: 'Steady Hands', icon: '🎯', baseCost: 70, rate: 1.65, amt: 0.015 },
+};
+
 // Repeatable abilities (Store upgrades, the Staff pour upgrade, and matching
 // perk cards) cap out at this level for balance — bypassed in DEV_MODE.
 const ABILITY_LEVEL_CAP = 10;
@@ -124,27 +130,21 @@ const WALL_THEMES = {
   brick: { name: 'Red Brick', price: 70, top: 0x7e4038, bottom: 0x9e564c, pattern: 'brick', swatch: 0x8c4a40,
     perk: { stat: 'patience', amt: 1, text: '+1s patience' } },
   sky: { name: 'Sky Blue', price: 80, top: 0x6fa8d6, bottom: 0xb2dcf2, pattern: 'stripes', swatch: 0x8fc2e6,
-    perk: { stat: 'tips', amt: 0.1, text: '+10% tips' } },
+    perk: { stat: 'combo', amt: 0.015, text: '+combo pay' } },
   forest: { name: 'Forest', price: 80, top: 0x336e42, bottom: 0x57935f, pattern: 'stripes', swatch: 0x44803f,
     perk: { stat: 'patience', amt: 1.5, text: '+1.5s patience' } },
   sunset: { name: 'Sunset', price: 100, top: 0xd9663f, bottom: 0xf2b06a, pattern: 'plain', swatch: 0xe68a52,
     perk: { stat: 'combo', amt: 0.02, text: '+combo pay' } },
   cafe: { name: 'Cozy Wood', price: 120, top: 0x5a3f2a, bottom: 0x82603c, pattern: 'panel', swatch: 0x6e4f33,
-    perk: { stat: 'pour', amt: 0.04, text: '+pour speed' } },
+    perk: { stat: 'combo', amt: 0.025, text: '+combo pay' } },
 };
 
-// Coffee-maker skins → which textures to apply to the two machines.
-const MAKER_SKINS = {
-  classic: { name: 'Classic Steel', price: 0, mKey: 'machine', dKey: 'dripper' },
-  black: { name: 'Matte Black', price: 130, mKey: 'machine_black', dKey: 'dripper_black',
-    perk: { stat: 'tips', amt: 0.15, text: '+15% tips' } },
-  mint: { name: 'Mint Fresh', price: 130, mKey: 'machine_mint', dKey: 'dripper_mint',
-    perk: { stat: 'patience', amt: 1.5, text: '+1.5s patience' } },
-  copper: { name: 'Copper', price: 140, mKey: 'machine_copper', dKey: 'dripper_copper',
-    perk: { stat: 'feet', amt: 40, text: 'faster moves' } },
-  gold: { name: 'Gilded Brass', price: 170, mKey: 'machine2', dKey: 'dripper2',
-    perk: { stat: 'pour', amt: 0.06, text: '+pour speed' } },
-};
+// Machine "skin" tiers — auto-applied per station once BOTH its Pour Speed
+// and Steady Hands upgrades reach the tier's level (tier = min of the two,
+// capped at the highest tier). Tier 0 is each station's default texture
+// (e.g. 'machine'); tiers 1-5 use '<tex>_<id>' textures generated in
+// pixelArt.js (SKIN_TIER_PALETTES).
+const STATION_SKIN_TIERS = ['black', 'mint', 'copper', 'silver', 'gold'];
 
 class GameScene extends Phaser.Scene {
   constructor() {
@@ -153,10 +153,7 @@ class GameScene extends Phaser.Scene {
 
   create() {
     // Run upgrades (modified by perk cards) — reset every run.
-    this.pourBonus = 0;
-    this.tipMult = 1.0;
     this.patienceBonus = 0;
-    this.tolBonus = 0;
     this.baristaMoveDur = 360;
     this.comboStep = 0.1;
     this.maxLives = 3;
@@ -164,11 +161,11 @@ class GameScene extends Phaser.Scene {
 
     this.storeTab = 'walls';
     this.decorCatalog = [
-      { id: 'art', name: 'Wall Art', price: 40, emoji: '🖼', place: () => this.placeArt(), perk: { stat: 'tips', amt: 0.05, text: '+5% tips' } },
+      { id: 'art', name: 'Wall Art', price: 40, emoji: '🖼', place: () => this.placeArt(), perk: { stat: 'combo', amt: 0.01, text: '+combo pay' } },
       { id: 'plant2', name: 'Potted Plant', price: 50, emoji: '🪴', place: () => this.addPlant(), perk: { stat: 'patience', amt: 1.5, text: '+1.5s patience' } },
-      { id: 'rug', name: 'Floor Rug', price: 60, emoji: '🟧', place: () => this.placeRug(), perk: { stat: 'tips', amt: 0.1, text: '+10% tips' } },
+      { id: 'rug', name: 'Floor Rug', price: 60, emoji: '🟧', place: () => this.placeRug(), perk: { stat: 'combo', amt: 0.015, text: '+combo pay' } },
       { id: 'lights', name: 'String Lights', price: 80, emoji: '✨', place: () => this.placeStringLights(), perk: { stat: 'patience', amt: 1.5, text: '+1.5s patience' } },
-      { id: 'cat', name: 'Shop Cat', price: 90, emoji: '🐱', place: () => this.placeCat(), perk: { stat: 'tips', amt: 0.15, text: 'lucky +15% tips' } },
+      { id: 'cat', name: 'Shop Cat', price: 90, emoji: '🐱', place: () => this.placeCat(), perk: { stat: 'combo', amt: 0.02, text: 'lucky +combo pay' } },
       { id: 'neon', name: 'Neon Sign', price: 120, emoji: '🟪', place: () => this.placeNeon(), perk: { stat: 'combo', amt: 0.03, text: '+combo pay' } },
     ];
 
@@ -176,25 +173,23 @@ class GameScene extends Phaser.Scene {
     this.coins = DEV_MODE ? 999999 : 0;
     this.runStartBest = Save.data.bestLevel;
     this.equippedWall = 'plaster';
-    this.equippedMaker = 'classic';
     this.ownedWalls = new Set(['plaster']);
-    this.ownedMakers = new Set(['classic']);
     this.ownedDecor = new Set();
 
     // Repeatable mechanical upgrades (same effects as the level-end perks),
     // now buyable in the Store. Cost escalates with each level purchased.
     this.shopUpgrades = [
-      { id: 'pour', title: 'Faster Pour', icon: '⚡', baseCost: 40, rate: 1.55, level: 0, perk: { stat: 'pour', amt: 0.07 } },
-      { id: 'tips', title: 'Generous Tips', icon: '💰', baseCost: 60, rate: 1.6, level: 0, perk: { stat: 'tips', amt: 0.25 } },
-      { id: 'calm', title: 'Calm Crowd', icon: '😌', baseCost: 55, rate: 1.55, level: 0, perk: { stat: 'patience', amt: 2 } },
-      { id: 'steady', title: 'Steady Hands', icon: '🎯', baseCost: 70, rate: 1.65, level: 0, perk: { stat: 'tol', amt: 0.015 } },
+      { id: 'calm', title: 'Calm Crowd', icon: '😌', baseCost: 55, rate: 1.55, level: 0, perk: { stat: 'patience', amt: 0.5 } },
       { id: 'combo', title: 'Combo Pro', icon: '🔥', baseCost: 80, rate: 1.7, level: 0, perk: { stat: 'combo', amt: 0.04 } },
       { id: 'heart', title: 'Extra Heart', icon: '❤️', baseCost: 120, rate: 2.0, level: 0, perk: { stat: 'heart', amt: 1 } },
     ];
 
     // Combined level count per stat across Store upgrades + perk-card picks.
     // Cosmetic one-time perks (walls/makers/decor) are NOT tracked here.
-    this.abilityLevels = { pour: 0, tips: 0, patience: 0, tol: 0, combo: 0, heart: 0, feet: 0 };
+    this.abilityLevels = { patience: 0, combo: 0, heart: 0, feet: 0 };
+
+    // Per-machine selection for the Store's "Machines" tab.
+    this.storeMachineIndex = 0;
 
     // Runtime state.
     this.fill = 0;          // total fill, including locked layers below
@@ -266,43 +261,43 @@ class GameScene extends Phaser.Scene {
     this.updateHearts();
     this.showBanner('LEVEL ' + n, '#ffe082', 'Serve ' + this.cfg.quota + ' drinks');
     if (n === 1) {
-      this.time.delayedCall(1000, () => this.showTutorial(
+      this.time.delayedCall(1000, () => this.showTutorialOnce('l1Welcome',
         GW / 2, COUNTER_TOP - 150,
         'Welcome to ' + (Save.data.shopName || 'Brewhaven') + ', '
           + (Save.data.baristaName || 'Barista') + '!\n'
           + 'When customers walk in, their\norder appears in a bubble above\n'
           + 'their head — match the drink,\nthen pour it at the right station.',
-        () => this.showTutorial(
+        () => this.showTutorialOnce('l1Espresso',
           STATIONS[0].x, COUNTER_TOP - 150,
           'This is your espresso\nmachine — use it to fill\nespresso orders!'
         )
       ));
     } else if (n === 2) {
-      this.time.delayedCall(1300, () => this.showTutorial(
+      this.time.delayedCall(1300, () => this.showTutorialOnce('l2Drip',
         STATIONS[1].x, COUNTER_TOP - 150,
         'New machine! Customers\ncan now order Drip Coffee\n— use this machine to fill\nthose orders!'
       ));
     } else if (n === 3) {
-      this.time.delayedCall(1000, () => this.showTutorial(
+      this.time.delayedCall(1000, () => this.showTutorialOnce('l3Tea',
         STATIONS[1].x, COUNTER_TOP - 150,
         'The drip machine can now\nalso serve Tea — use it to\nfill tea orders too!',
-        () => this.showTutorial(
+        () => this.showTutorialOnce('l3Store',
           GW / 2, COUNTER_TOP - 150,
-          'Tip: open the STORE\n(top right) anytime to\nspend coins on upgrades,\nwalls, maker skins, and\ndecorations!'
+          'Tip: open the STORE\n(top right) anytime to\nspend coins on upgrades,\nmachine skins, walls, and\ndecorations!'
         )
       ));
     } else if (n === 5) {
-      this.time.delayedCall(1300, () => this.showTutorial(
+      this.time.delayedCall(1300, () => this.showTutorialOnce('l5Milk',
         STATIONS[2].x, COUNTER_TOP - 150,
         'New machine! Customers\ncan now order Lattes &\nMatchas — pour the base,\nthen top up here with\nmilk/cream!'
       ));
     } else if (n === 10) {
-      this.time.delayedCall(1300, () => this.showTutorial(
+      this.time.delayedCall(1300, () => this.showTutorialOnce('l10Soda',
         STATIONS[3].x, COUNTER_TOP - 150,
         'New machine! Customers\ncan now order Cola &\nDirty Cola — Dirty Cola\nneeds cream from the milk\nstation after!'
       ));
     } else if (n === 11) {
-      this.time.delayedCall(1300, () => this.showTutorial(
+      this.time.delayedCall(1300, () => this.showTutorialOnce('l11Staff',
         GW / 2, COUNTER_TOP - 150,
         'You cleared Level 10!\nThe Store now has a\nStaff tab — hire a\nbarista to auto-pour one\nmachine for you!'
       ));
@@ -415,6 +410,8 @@ class GameScene extends Phaser.Scene {
     // until revealStation() pops them in at their unlock level. ---
     STATIONS.forEach((st) => {
       st.revealed = false;
+      st.pourLevel = 0;
+      st.tolLevel = 0;
       st.shadowObj = this.add.image(st.x, COUNTER_TOP, 'softshadow')
         .setScale(1.9, 0.45).setAlpha(0.4).setDepth(4).setVisible(false);
       st.machine = this.add.image(st.x, COUNTER_TOP, st.tex)
@@ -814,7 +811,8 @@ class GameScene extends Phaser.Scene {
     if (this.state !== 'playing') return;
 
     if (this.pouring && !this.serving) {
-      this.fill += (this.activeStation().pourSpeed + this.pourBonus) * dt;
+      const activeSt = this.activeStation();
+      this.fill += (activeSt.pourSpeed + activeSt.pourLevel * STATION_UPGRADES.pour.amt) * dt;
       const liqTop = CUP.innerBottom - this.fill * CUP.innerH;
       this.splash.setParticleTint(this.brewColor());
       this.splash.setPosition(this.cupX(), Math.max(CUP.innerTop, liqTop));
@@ -878,7 +876,7 @@ class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: st.machine, scaleX: 6.25, duration: 90, yoyo: true });
     }
 
-    this.fill += (st.pourSpeed + emp.pourLevel * EMPLOYEE_POUR_UPGRADE.amt) * dt;
+    this.fill += (st.pourSpeed + st.pourLevel * STATION_UPGRADES.pour.amt + emp.pourLevel * EMPLOYEE_POUR_UPGRADE.amt) * dt;
     const liqTop = CUP.innerBottom - this.fill * CUP.innerH;
     this.splash.setParticleTint(step.color);
     this.splash.setPosition(st.x, Math.max(CUP.innerTop, liqTop));
@@ -907,7 +905,7 @@ class GameScene extends Phaser.Scene {
     const variant = Phaser.Math.Between(0, 7);
     const drink = Phaser.Utils.Array.GetRandom(this.cfg.drinkPool);
     const steps = drink.steps.map((s) => {
-      const tol = Math.max(0.025, s.tol * this.cfg.tolScale + this.tolBonus);
+      const tol = Math.max(0.025, s.tol * this.cfg.tolScale + this.stationFor(s.station).tolLevel * STATION_UPGRADES.tol.amt);
       return { ...s, tol, band: [s.target - tol, s.target + tol] };
     });
     const order = { name: drink.name, letter: drink.letter, mult: drink.mult, steps };
@@ -1003,7 +1001,7 @@ class GameScene extends Phaser.Scene {
     else this.streak = 0;
     const comboMult = 1 + Math.min(this.streak, 10) * this.comboStep;
     const qMult = { perfect: 1.6, good: 1.0, poor: 0.4, wrong: 0.3, spill: 0.2 }[quality];
-    const reward = Math.max(1, Math.round(8 * o.mult * qMult * this.tipMult * comboMult));
+    const reward = Math.max(1, Math.round(8 * o.mult * qMult * comboMult));
 
     const flyCup = this.add.image(station.x, CUP.top + 30, 'cup').setScale(4).setDepth(30)
       .setTint(o.steps[o.steps.length - 1].color);
@@ -1084,6 +1082,19 @@ class GameScene extends Phaser.Scene {
   // ===========================================================================
   // Juice helpers
   // ===========================================================================
+  // Like showTutorial, but only the first time `id` is shown across the
+  // player's save — returning players (or replays of an already-cleared
+  // level) skip straight past it (still chaining into `onClose`, if any).
+  showTutorialOnce(id, x, y, text, onClose) {
+    if (Save.data.seenTutorials.includes(id)) {
+      if (onClose) onClose();
+      return;
+    }
+    Save.data.seenTutorials.push(id);
+    Save.write();
+    this.showTutorial(x, y, text, onClose);
+  }
+
   // A small speech-bubble popup pointing down at a station, for one-time tips.
   // Pauses the level (spawns + customer patience) until the player taps
   // "GOT IT", so they have time to read it. `onClose` fires once dismissed —
@@ -1267,7 +1278,7 @@ class GameScene extends Phaser.Scene {
     const sbg = this.add.graphics();
     sbg.fillStyle(0x4a3a6a, 1); sbg.fillRoundedRect(-54, -16, 108, 32, 8);
     sbg.lineStyle(2, 0xb9a6e0, 1); sbg.strokeRoundedRect(-54, -16, 108, 32, 8);
-    const slabel = this.add.text(0, 0, '🛍 STORE', {
+    const slabel = this.add.text(0, 0, '🛍 STORE / PAUSE', {
       fontFamily: 'monospace', fontSize: FS(14), color: '#f4efe6', fontStyle: 'bold',
     }).setOrigin(0.5);
     this.storeBtn.add([sbg, slabel]);
@@ -1309,10 +1320,7 @@ class GameScene extends Phaser.Scene {
   // ===========================================================================
   cardPool() {
     const all = [
-      { title: 'Faster Pour', desc: 'Both makers flow quicker', perk: { stat: 'pour', amt: 0.07 } },
-      { title: 'Generous Tips', desc: '+30% coins earned', perk: { stat: 'tips', amt: 0.3 } },
-      { title: 'Calm Crowd', desc: '+2.5s customer patience', perk: { stat: 'patience', amt: 2.5 } },
-      { title: 'Steady Hands', desc: 'Wider green fill zone', perk: { stat: 'tol', amt: 0.02 } },
+      { title: 'Calm Crowd', desc: '+0.6s customer patience', perk: { stat: 'patience', amt: 0.6 } },
       { title: 'Quick Feet', desc: 'Move between makers faster', perk: { stat: 'feet', amt: 70 } },
       { title: 'Combo Pro', desc: 'Combos pay even more', perk: { stat: 'combo', amt: 0.05 } },
       { title: 'Extra Heart', desc: '+1 max heart & heal one', perk: { stat: 'heart', amt: 1 } },
@@ -1428,7 +1436,7 @@ class GameScene extends Phaser.Scene {
   }
 
   // ===========================================================================
-  // Cosmetics: wall themes, maker skins, decorations
+  // Cosmetics: wall themes, decorations
   // ===========================================================================
   drawWall(themeId) {
     const t = WALL_THEMES[themeId] || WALL_THEMES.plaster;
@@ -1474,23 +1482,32 @@ class GameScene extends Phaser.Scene {
     this.drawWall(id);
   }
 
-  equipMaker(id) {
-    const s = MAKER_SKINS[id];
-    this.equippedMaker = id;
-    STATIONS[0].machine.setTexture(s.mKey);
-    STATIONS[1].machine.setTexture(s.dKey);
-    STATIONS.forEach((st) => this.tweens.add({ targets: st.machine, scaleY: 6.3, duration: 140, yoyo: true }));
+  // Tier = how many skin levels a station has unlocked, based on the LOWER
+  // of its Pour Speed / Steady Hands levels (capped at the top tier).
+  stationSkinTier(st) {
+    return Math.min(st.pourLevel, st.tolLevel, STATION_SKIN_TIERS.length);
+  }
+
+  stationTexture(st) {
+    const tier = this.stationSkinTier(st);
+    return tier === 0 ? st.tex : st.tex + '_' + STATION_SKIN_TIERS[tier - 1];
+  }
+
+  // Re-applies a station's skin texture to match its current tier; called
+  // after a Pour Speed / Steady Hands purchase in case the tier changed.
+  refreshStationSkin(st) {
+    const tex = this.stationTexture(st);
+    if (st.machine.texture.key === tex) return;
+    st.machine.setTexture(tex);
+    this.tweens.add({ targets: st.machine, scaleY: 6.3, duration: 140, yoyo: true });
   }
 
   // Apply a one-time/levelled mechanical perk (shared by cosmetics + upgrades).
   applyPerk(perk) {
     if (!perk) return;
     switch (perk.stat) {
-      case 'pour': this.pourBonus += perk.amt; break;
-      case 'tips': this.tipMult += perk.amt; break;
       case 'patience': this.patienceBonus += perk.amt; break;
       case 'combo': this.comboStep += perk.amt; break;
-      case 'tol': this.tolBonus += perk.amt; break;
       case 'feet': this.baristaMoveDur = Math.max(150, this.baristaMoveDur - perk.amt); break;
       case 'heart':
         this.maxLives += perk.amt;
@@ -1505,6 +1522,15 @@ class GameScene extends Phaser.Scene {
 
   abilityMaxed(stat) {
     return !DEV_MODE && (this.abilityLevels[stat] || 0) >= ABILITY_LEVEL_CAP;
+  }
+
+  stationUpgradeCost(st, key) {
+    const u = STATION_UPGRADES[key];
+    return Math.floor(u.baseCost * Math.pow(u.rate, st[key + 'Level']));
+  }
+
+  stationUpgradeMaxed(st, key) {
+    return !DEV_MODE && st[key + 'Level'] >= ABILITY_LEVEL_CAP;
   }
 
   // Rebuild the store on the NEXT tick. Doing it synchronously inside a button's
@@ -1615,7 +1641,7 @@ class GameScene extends Phaser.Scene {
     this.storeUI.push(close);
 
     // Tabs.
-    const tabs = [['upgrades', 'Upgrades'], ['walls', 'Walls'], ['makers', 'Makers'], ['decor', 'Decor'], ['staff', 'Staff']];
+    const tabs = [['upgrades', 'Upgrades'], ['machines', 'Machines'], ['walls', 'Walls'], ['decor', 'Decor'], ['staff', 'Staff']];
     let tx = cx - pw / 2 + 24;
     const ty = cy - ph / 2 + 78;
     tabs.forEach(([id, label]) => {
@@ -1652,19 +1678,64 @@ class GameScene extends Phaser.Scene {
           onActivate: () => this.storeAction('upgrade', u.id),
         };
       });
+    } else if (this.storeTab === 'machines') {
+      // Station selector row.
+      const selY = cy - 70;
+      const btnW = 80, btnH = 60, selGap = 14;
+      const selStartX = cx - (STATIONS.length * btnW + (STATIONS.length - 1) * selGap) / 2 + btnW / 2;
+      STATIONS.forEach((st, i) => {
+        const active = this.storeMachineIndex === i;
+        const locked = !st.revealed;
+        const bx = selStartX + i * (btnW + selGap);
+        const bg = this.add.graphics().setDepth(202);
+        bg.fillStyle(active ? 0x6a5490 : 0x352b48, 1);
+        bg.fillRoundedRect(bx - btnW / 2, selY - btnH / 2, btnW, btnH, 8);
+        if (active) { bg.lineStyle(2, 0xb9a6e0, 1); bg.strokeRoundedRect(bx - btnW / 2, selY - btnH / 2, btnW, btnH, 8); }
+        this.storeUI.push(bg);
+        const img = this.add.image(bx, selY - 8, this.stationTexture(st)).setScale(1.4).setDepth(203).setAlpha(locked ? 0.35 : 1);
+        this.storeUI.push(img);
+        const lbl = this.add.text(bx, selY + 19, locked ? '🔒 Locked' : st.sign, {
+          fontFamily: 'monospace', fontSize: FS(9), color: locked ? '#9a8fb0' : (active ? '#fff' : '#b9a6e0'), fontStyle: 'bold',
+          align: 'center', wordWrap: { width: btnW - 6 },
+        }).setOrigin(0.5).setDepth(203);
+        this.storeUI.push(lbl);
+        const hit = this.add.rectangle(bx, selY, btnW, btnH).setDepth(204).setInteractive({ useHandCursor: !locked });
+        if (!locked) {
+          hit.on('pointerdown', () => { if (this.storeMachineIndex !== i) { this.storeMachineIndex = i; this.refreshStoreSoon(); } });
+        } else {
+          hit.on('pointerdown', () => SFX.buzz());
+        }
+        this.storeUI.push(hit);
+      });
+
+      const selSt = STATIONS[this.storeMachineIndex];
+      if (!selSt.revealed) {
+        this.storeUI.push(this.add.text(cx, cy + 60, '🔒 ' + selSt.sign + ' unlocks at\nLevel ' + selSt.unlock, {
+          fontFamily: 'monospace', fontSize: FS(16), color: '#9a8fb0', fontStyle: 'bold', align: 'center',
+        }).setOrigin(0.5).setDepth(202));
+        return;
+      }
+      const mCardW = 200, mCardH = 150, mGap = 18, mY = cy + 50;
+      ['pour', 'tol'].forEach((key, i) => {
+        const u = STATION_UPGRADES[key];
+        const lvl = selSt[key + 'Level'];
+        const maxed = this.stationUpgradeMaxed(selSt, key);
+        const info = {
+          id: key, title: u.title, price: this.stationUpgradeCost(selSt, key), owned: false, equipped: false, canEquip: false,
+          repeatable: true, thumbType: 'emoji', thumbVal: u.icon,
+          subline: 'Lv ' + lvl + (maxed ? ' (MAX)' : ''), sublineColor: maxed ? '#7fd98f' : '#ffd166',
+          statusOverride: maxed ? { text: 'MAXED', color: '#6abf5a', clickable: false } : undefined,
+          onActivate: () => this.storeAction('stationUpgrade', { station: this.storeMachineIndex, key }),
+        };
+        this.makeStoreCard(cx + (i === 0 ? -1 : 1) * (mCardW + mGap) / 2, mY, mCardW, mCardH, info);
+      });
+      return;
     } else if (this.storeTab === 'walls') {
       items = Object.keys(WALL_THEMES).map((id) => {
         const t = WALL_THEMES[id];
         return { id, title: t.name, price: t.price, owned: this.ownedWalls.has(id), equipped: this.equippedWall === id,
           canEquip: true, thumbType: 'color', thumbVal: t.swatch,
           subline: t.perk && t.perk.text, sublineColor: '#7fd98f', onActivate: () => this.storeAction('wall', id) };
-      });
-    } else if (this.storeTab === 'makers') {
-      items = Object.keys(MAKER_SKINS).map((id) => {
-        const s = MAKER_SKINS[id];
-        return { id, title: s.name, price: s.price, owned: this.ownedMakers.has(id), equipped: this.equippedMaker === id,
-          canEquip: true, thumbType: 'tex', thumbVal: s.mKey,
-          subline: s.perk && s.perk.text, sublineColor: '#7fd98f', onActivate: () => this.storeAction('maker', id) };
       });
     } else if (this.storeTab === 'decor') {
       items = this.decorCatalog.map((d) => ({
@@ -1780,14 +1851,6 @@ class GameScene extends Phaser.Scene {
         this.coins -= t.price; this.ownedWalls.add(id); SFX.cash();
         this.equipWall(id); this.applyPerk(t.perk); this.updateCoinText();
       }
-    } else if (type === 'maker') {
-      const s = MAKER_SKINS[id];
-      if (this.ownedMakers.has(id)) { this.equipMaker(id); SFX.blip(720, 0.05); }
-      else {
-        if (this.coins < s.price) { SFX.buzz(); return; }
-        this.coins -= s.price; this.ownedMakers.add(id); SFX.cash();
-        this.equipMaker(id); this.applyPerk(s.perk); this.updateCoinText();
-      }
     } else if (type === 'decor') {
       const d = this.decorCatalog.find((x) => x.id === id);
       if (this.ownedDecor.has(id)) return;
@@ -1809,6 +1872,13 @@ class GameScene extends Phaser.Scene {
       const cost = this.employeePourCost();
       if (this.coins < cost) { SFX.buzz(); return; }
       this.coins -= cost; this.employee.pourLevel++; SFX.cash(); this.updateCoinText();
+    } else if (type === 'stationUpgrade') {
+      const st = STATIONS[id.station];
+      if (this.stationUpgradeMaxed(st, id.key)) { SFX.buzz(); return; }
+      const cost = this.stationUpgradeCost(st, id.key);
+      if (this.coins < cost) { SFX.buzz(); return; }
+      this.coins -= cost; st[id.key + 'Level']++; SFX.cash(); this.updateCoinText();
+      this.refreshStationSkin(st);
     } else { // upgrade (repeatable)
       const u = this.shopUpgrades.find((x) => x.id === id);
       if (this.abilityMaxed(u.perk.stat)) { SFX.buzz(); return; }

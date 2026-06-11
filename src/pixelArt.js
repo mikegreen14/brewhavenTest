@@ -45,6 +45,17 @@ const PAL = {
   q: '#b8b8c0',
 };
 
+// Palette overrides for each machine "skin" tier (recolors the steel/trim
+// parts: highlight, body, shadow, deep shadow, and accent). Order matches
+// STATION_SKIN_TIERS in GameScene.js (tier 1 = black, ... tier 5 = gold).
+const SKIN_TIER_PALETTES = {
+  black: { H: '#6a6a74', S: '#3a3a44', s: '#2a2a32', d: '#1e1e26', I: '#15151c' },
+  mint: { H: '#e2f7ef', S: '#8fe0cf', s: '#5fc4b0', d: '#3a9e8c', I: '#2f7e70' },
+  copper: { H: '#ffe0b0', S: '#d98a55', s: '#b96b3c', d: '#8a4e2a', I: '#6e3c20' },
+  silver: { H: '#ffffff', S: '#eef2f7', s: '#c3c9d4', d: '#9aa1ae', I: '#7d8492' },
+  gold: { H: '#fff3c4', S: '#ffe082', s: '#f5c542', d: '#c8961f', I: '#9c6f1a' },
+};
+
 const SPRITES = {
   // Espresso machine (16x16): chrome body, screen w/ reflection, group head, spouts.
   machine: [
@@ -394,26 +405,14 @@ function buildAllTextures(scene) {
     makePixelTexture(scene, key, SPRITES[key], PAL);
   }
 
-  // Gold "deluxe" finishes via palette overrides (no extra grids to maintain).
-  const gold = Object.assign({}, PAL, {
-    H: '#fff3c4', S: '#ffe082', s: '#f5c542', d: '#c8961f', I: '#9c6f1a', x: '#3a2c22',
-  });
-  makePixelTexture(scene, 'machine2', SPRITES.machine, gold);
-  const goldDrip = Object.assign({}, PAL, {
-    d: '#a8761f', s: '#f5c542', g: '#ffe9b0', H: '#fff3c4',
-  });
-  makePixelTexture(scene, 'dripper2', SPRITES.dripper, goldDrip);
-
-  // Store-bought coffee-maker skins (recolor the steel parts).
-  const skinOverrides = {
-    black: { H: '#6a6a74', S: '#3a3a44', s: '#2a2a32', d: '#1e1e26', I: '#15151c' },
-    mint: { H: '#e2f7ef', S: '#8fe0cf', s: '#5fc4b0', d: '#3a9e8c', I: '#2f7e70' },
-    copper: { H: '#ffe0b0', S: '#d98a55', s: '#b96b3c', d: '#8a4e2a', I: '#6e3c20' },
-  };
-  for (const id in skinOverrides) {
-    const pal = Object.assign({}, PAL, skinOverrides[id]);
-    makePixelTexture(scene, 'machine_' + id, SPRITES.machine, pal);
-    makePixelTexture(scene, 'dripper_' + id, SPRITES.dripper, pal);
+  // Machine "skin" tiers, unlocked automatically as a station's Pour Speed
+  // and Steady Hands upgrades both reach a given level (see STATION_SKIN_TIERS
+  // in GameScene.js). Recolors the steel/trim parts of every station sprite.
+  for (const id in SKIN_TIER_PALETTES) {
+    const pal = Object.assign({}, PAL, SKIN_TIER_PALETTES[id]);
+    ['machine', 'dripper', 'milker', 'soda'].forEach((spriteKey) => {
+      makePixelTexture(scene, spriteKey + '_' + id, SPRITES[spriteKey], pal);
+    });
   }
 
   CUSTOMER_SHIRTS.forEach((shirt, i) => {
