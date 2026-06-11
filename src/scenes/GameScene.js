@@ -428,10 +428,10 @@ class GameScene extends Phaser.Scene {
     }).setDepth(80);
 
     // --- Vignette over the whole scene (under the UI), kept gentle ---
-    this.add.image(GW / 2, GH / 2, 'vignette').setDisplaySize(GW, GH).setDepth(90).setAlpha(0.85);
+    this.add.image(GW / 2, GH / 2, 'vignette').setDisplaySize(GW, GH).setDepth(90).setAlpha(VIGNETTE_ALPHA);
 
     this.add.text(GW - 16, 14, 'BREWHAVEN', {
-      fontFamily: 'monospace', fontSize: '20px', color: '#f4efe6', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(20), color: '#f4efe6', fontStyle: 'bold',
     }).setOrigin(1, 0).setDepth(100).setAlpha(0.85);
   }
 
@@ -486,7 +486,7 @@ class GameScene extends Phaser.Scene {
   makeSign(x, y, text, color) {
     const cont = this.add.container(x, y).setDepth(7);
     const t = this.add.text(0, 0, text, {
-      fontFamily: 'monospace', fontSize: '13px', color: '#fff', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(13), color: '#fff', fontStyle: 'bold',
     }).setOrigin(0.5);
     const pad = 8;
     const bg = this.add.graphics();
@@ -504,7 +504,7 @@ class GameScene extends Phaser.Scene {
   buildPourStation() {
     this.cupGfx = this.add.graphics().setDepth(20);
     this.drinkLabel = this.add.text(STATIONS[0].x, CUP.top - 22, '', {
-      fontFamily: 'monospace', fontSize: '14px', color: '#fff', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(14), color: '#fff', fontStyle: 'bold',
       stroke: '#2a2030', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(21);
 
@@ -886,19 +886,20 @@ class GameScene extends Phaser.Scene {
     const bubble = this.add.container(0, -104);
     const bg = this.add.graphics();
     // Border color = which station to go to NEXT; redrawn as steps advance.
+    const bw = 44 * UI_SCALE, bh = 26 * UI_SCALE;
     const drawBubbleBg = (col) => {
       bg.clear();
-      bg.fillStyle(0xffffff, 1); bg.fillRoundedRect(-44, -26, 88, 44, 8);
-      bg.lineStyle(3, col, 1); bg.strokeRoundedRect(-44, -26, 88, 44, 8);
-      bg.fillStyle(0xffffff, 1); bg.fillTriangle(-6, 16, 6, 16, 0, 26);
+      bg.fillStyle(0xffffff, 1); bg.fillRoundedRect(-bw, -bh, bw * 2, bh * 2, 8);
+      bg.lineStyle(3, col, 1); bg.strokeRoundedRect(-bw, -bh, bw * 2, bh * 2, 8);
+      bg.fillStyle(0xffffff, 1); bg.fillTriangle(-6 * UI_SCALE, bh * 0.6, 6 * UI_SCALE, bh * 0.6, 0, bh + 10 * UI_SCALE);
     };
     drawBubbleBg(this.stationFor(steps[0].station).color);
-    const miniCup = this.add.image(-26, -4, 'cup').setScale(2.2).setTint(steps[steps.length - 1].color);
-    const letter = this.add.text(6, -4, order.letter, {
-      fontFamily: 'monospace', fontSize: '22px', color: '#2a2030', fontStyle: 'bold',
+    const miniCup = this.add.image(-26 * UI_SCALE, -4 * UI_SCALE, 'cup').setScale(2.2 * UI_SCALE).setTint(steps[steps.length - 1].color);
+    const letter = this.add.text(6 * UI_SCALE, -4 * UI_SCALE, order.letter, {
+      fontFamily: 'monospace', fontSize: FS(22), color: '#2a2030', fontStyle: 'bold',
     }).setOrigin(0.5);
-    const sub = this.add.text(0, 10, order.name, {
-      fontFamily: 'monospace', fontSize: '9px', color: '#6a5570',
+    const sub = this.add.text(0, 10 * UI_SCALE, order.name, {
+      fontFamily: 'monospace', fontSize: FS(9), color: '#6a5570',
     }).setOrigin(0.5);
     bubble.add([bg, miniCup, letter, sub]);
 
@@ -1061,11 +1062,11 @@ class GameScene extends Phaser.Scene {
 
     const cont = this.add.container(x, y).setDepth(160).setAlpha(0).setScale(0.8);
     const t = this.add.text(0, 0, text, {
-      fontFamily: 'monospace', fontSize: '13px', color: '#2a2030', fontStyle: 'bold',
-      align: 'center', wordWrap: { width: 190 },
+      fontFamily: 'monospace', fontSize: FS(13), color: '#2a2030', fontStyle: 'bold',
+      align: 'center', wordWrap: { width: 190 * UI_SCALE },
     }).setOrigin(0.5);
 
-    const padX = 14, padTop = 10, btnGap = 10, btnW = 96, btnH = 30;
+    const padX = 14, padTop = 10, btnGap = 10, btnW = 96 * UI_SCALE, btnH = 30 * UI_SCALE;
     const w = Math.max(t.width + padX * 2, btnW + 28);
     const h = t.height + padTop * 2 + btnGap + btnH + 14;
     t.setPosition(0, -h / 2 + padTop + t.height / 2);
@@ -1085,7 +1086,7 @@ class GameScene extends Phaser.Scene {
     btnBg.lineStyle(2, 0x6abf5a, 1);
     btnBg.strokeRoundedRect(-btnW / 2, btnY - btnH / 2, btnW, btnH, 8);
     const btnLabel = this.add.text(0, btnY, 'GOT IT', {
-      fontFamily: 'monospace', fontSize: '13px', color: '#fff', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(13), color: '#fff', fontStyle: 'bold',
     }).setOrigin(0.5);
     cont.add([bg, t, btnBg, btnLabel]);
 
@@ -1114,7 +1115,7 @@ class GameScene extends Phaser.Scene {
 
   floatingText(x, y, text, color) {
     const t = this.add.text(x, y, text, {
-      fontFamily: 'monospace', fontSize: '20px', color, fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(20), color, fontStyle: 'bold',
       stroke: '#2a2030', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(60);
     this.tweens.add({ targets: t, y: y - 40, alpha: 0, duration: 900, ease: 'Quad.out', onComplete: () => t.destroy() });
@@ -1126,7 +1127,7 @@ class GameScene extends Phaser.Scene {
     if (c.leaving) return;
     const cont = this.add.container(0, -184);
     const t = this.add.text(0, 0, text, {
-      fontFamily: 'monospace', fontSize: '11px', color: '#2a2030', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(11), color: '#2a2030', fontStyle: 'bold',
       align: 'center', wordWrap: { width: 110 },
     }).setOrigin(0.5);
     const padX = 8, padY = 6;
@@ -1146,7 +1147,7 @@ class GameScene extends Phaser.Scene {
   // (wrong drink, spill, or walkout).
   quipText(x, y, text) {
     const t = this.add.text(x, y, '"' + text + '"', {
-      fontFamily: 'monospace', fontSize: '12px', color: '#ffb3ab', fontStyle: 'italic',
+      fontFamily: 'monospace', fontSize: FS(12), color: '#ffb3ab', fontStyle: 'italic',
       align: 'center', wordWrap: { width: 150 },
     }).setOrigin(0.5).setDepth(60);
     this.tweens.add({ targets: t, y: y - 30, alpha: 0, duration: 1200, ease: 'Quad.out', delay: 350, onComplete: () => t.destroy() });
@@ -1181,14 +1182,14 @@ class GameScene extends Phaser.Scene {
 
   showBanner(text, color, subtitle) {
     const t = this.add.text(GW / 2, 200, text, {
-      fontFamily: 'monospace', fontSize: '48px', color, fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(48), color, fontStyle: 'bold',
       stroke: '#2a2030', strokeThickness: 6,
     }).setOrigin(0.5).setDepth(150).setScale(0.5).setAlpha(0);
     this.tweens.add({ targets: t, scale: 1, alpha: 1, duration: 280, ease: 'Back.out' });
     this.tweens.add({ targets: t, alpha: 0, y: 170, delay: 900, duration: 500, onComplete: () => t.destroy() });
     if (subtitle) {
       const s = this.add.text(GW / 2, 248, subtitle, {
-        fontFamily: 'monospace', fontSize: '18px', color: '#f4efe6', fontStyle: 'bold',
+        fontFamily: 'monospace', fontSize: FS(18), color: '#f4efe6', fontStyle: 'bold',
         stroke: '#2a2030', strokeThickness: 4,
       }).setOrigin(0.5).setDepth(150).setAlpha(0);
       this.tweens.add({ targets: s, alpha: 1, duration: 280, delay: 120 });
@@ -1200,29 +1201,29 @@ class GameScene extends Phaser.Scene {
   // UI
   // ===========================================================================
   buildUI() {
-    this.coinIcon = this.add.image(40, 44, 'coin').setScale(4).setDepth(100);
+    this.coinIcon = this.add.image(40, 44, 'coin').setScale(4 * UI_SCALE).setDepth(100);
     this.coinsText = this.add.text(62, 30, '', {
-      fontFamily: 'monospace', fontSize: '28px', color: '#ffe082', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(28), color: '#ffe082', fontStyle: 'bold',
       stroke: '#2a2030', strokeThickness: 4,
     }).setDepth(100);
     this.updateCoinText();
 
     this.streakText = this.add.text(40, 70, '', {
-      fontFamily: 'monospace', fontSize: '16px', color: '#ffd166', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(16), color: '#ffd166', fontStyle: 'bold',
       stroke: '#2a2030', strokeThickness: 3,
     }).setDepth(100);
 
     this.levelText = this.add.text(GW / 2, 16, '', {
-      fontFamily: 'monospace', fontSize: '20px', color: '#f4efe6', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(20), color: '#f4efe6', fontStyle: 'bold',
       stroke: '#2a2030', strokeThickness: 4,
     }).setOrigin(0.5, 0).setDepth(100);
     this.progressText = this.add.text(GW / 2, 42, '', {
-      fontFamily: 'monospace', fontSize: '14px', color: '#c9c0d0',
+      fontFamily: 'monospace', fontSize: FS(14), color: '#c9c0d0',
     }).setOrigin(0.5, 0).setDepth(100);
 
     this.heartIcons = [];
 
-    this.muteBtn = this.add.text(GW - 16, 44, '🔊', { fontSize: '22px' })
+    this.muteBtn = this.add.text(GW - 16, 44, '🔊', { fontSize: FS(22) })
       .setOrigin(1, 0).setDepth(100).setInteractive({ useHandCursor: true });
     this.muteBtn.on('pointerdown', () => this.muteBtn.setText(SFX.toggleMute() ? '🔇' : '🔊'));
 
@@ -1232,7 +1233,7 @@ class GameScene extends Phaser.Scene {
     sbg.fillStyle(0x4a3a6a, 1); sbg.fillRoundedRect(-54, -16, 108, 32, 8);
     sbg.lineStyle(2, 0xb9a6e0, 1); sbg.strokeRoundedRect(-54, -16, 108, 32, 8);
     const slabel = this.add.text(0, 0, '🛍 STORE', {
-      fontFamily: 'monospace', fontSize: '14px', color: '#f4efe6', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(14), color: '#f4efe6', fontStyle: 'bold',
     }).setOrigin(0.5);
     this.storeBtn.add([sbg, slabel]);
     const storeBtnHit = this.add.rectangle(GW - 70, 86, 108, 32).setDepth(101).setInteractive({ useHandCursor: true });
@@ -1242,7 +1243,7 @@ class GameScene extends Phaser.Scene {
 
     if (DEV_MODE) {
       this.add.text(GW - 16, GH - 16, 'DEV: 1-9/0=L1-10  +/-=lvl±1', {
-        fontFamily: 'monospace', fontSize: '11px', color: '#ffd166', fontStyle: 'bold',
+        fontFamily: 'monospace', fontSize: FS(11), color: '#ffd166', fontStyle: 'bold',
         stroke: '#2a2030', strokeThickness: 3,
       }).setOrigin(1, 1).setDepth(100).setAlpha(0.8);
     }
@@ -1262,7 +1263,7 @@ class GameScene extends Phaser.Scene {
     const startX = GW / 2 - ((this.maxLives - 1) * spacing) / 2;
     for (let i = 0; i < this.maxLives; i++) {
       const filled = i < this.lives;
-      const h = this.add.image(startX + i * spacing, 70, 'heart').setScale(3).setDepth(100);
+      const h = this.add.image(startX + i * spacing, 70, 'heart').setScale(3 * UI_SCALE).setDepth(100);
       if (!filled) h.setTint(0x44384a).setAlpha(0.6);
       this.heartIcons.push(h);
     }
@@ -1293,11 +1294,11 @@ class GameScene extends Phaser.Scene {
     const overlay = [];
     overlay.push(this.add.rectangle(GW / 2, GH / 2, GW, GH, 0x140f1a, 0.75).setDepth(200).setInteractive());
     overlay.push(this.add.text(GW / 2, 110, 'LEVEL ' + this.level + ' CLEAR', {
-      fontFamily: 'monospace', fontSize: '34px', color: '#6abf5a', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(34), color: '#6abf5a', fontStyle: 'bold',
       stroke: '#2a2030', strokeThickness: 5,
     }).setOrigin(0.5).setDepth(201));
     overlay.push(this.add.text(GW / 2, 152, 'Choose a perk', {
-      fontFamily: 'monospace', fontSize: '18px', color: '#f4efe6',
+      fontFamily: 'monospace', fontSize: FS(18), color: '#f4efe6',
     }).setOrigin(0.5).setDepth(201));
 
     const cw = 200, ch = 240, gap = 30;
@@ -1309,15 +1310,15 @@ class GameScene extends Phaser.Scene {
       bg.fillStyle(0x2e2438, 1); bg.fillRoundedRect(-cw / 2, -ch / 2, cw, ch, 12);
       bg.lineStyle(3, 0xffd166, 1); bg.strokeRoundedRect(-cw / 2, -ch / 2, cw, ch, 12);
       const title = this.add.text(0, -70, card.title, {
-        fontFamily: 'monospace', fontSize: '20px', color: '#ffe082', fontStyle: 'bold',
+        fontFamily: 'monospace', fontSize: FS(20), color: '#ffe082', fontStyle: 'bold',
         align: 'center', wordWrap: { width: cw - 24 },
       }).setOrigin(0.5);
       const desc = this.add.text(0, 20, card.desc, {
-        fontFamily: 'monospace', fontSize: '14px', color: '#d8d0e0',
+        fontFamily: 'monospace', fontSize: FS(14), color: '#d8d0e0',
         align: 'center', wordWrap: { width: cw - 28 },
       }).setOrigin(0.5);
       const hint = this.add.text(0, ch / 2 - 26, 'PICK', {
-        fontFamily: 'monospace', fontSize: '14px', color: '#6abf5a', fontStyle: 'bold',
+        fontFamily: 'monospace', fontSize: FS(14), color: '#6abf5a', fontStyle: 'bold',
       }).setOrigin(0.5);
       cont.add([bg, title, desc, hint]);
       const perkHit = this.add.rectangle(x, 340, cw, ch).setDepth(202).setInteractive({ useHandCursor: true });
@@ -1344,23 +1345,23 @@ class GameScene extends Phaser.Scene {
     const o = [];
     o.push(this.add.rectangle(GW / 2, GH / 2, GW, GH, 0x140f1a, 0.82).setDepth(200).setInteractive());
     o.push(this.add.text(GW / 2, 180, 'GAME OVER', {
-      fontFamily: 'monospace', fontSize: '52px', color: '#e5564d', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(52), color: '#e5564d', fontStyle: 'bold',
       stroke: '#2a2030', strokeThickness: 6,
     }).setOrigin(0.5).setDepth(201));
     o.push(this.add.text(GW / 2, 250, 'You reached Level ' + this.level + '\nCoins earned: ' + this.coins, {
-      fontFamily: 'monospace', fontSize: '20px', color: '#f4efe6', align: 'center',
+      fontFamily: 'monospace', fontSize: FS(20), color: '#f4efe6', align: 'center',
     }).setOrigin(0.5).setDepth(201));
 
     if (this.level > this.runStartBest) {
       const best = this.add.text(GW / 2, 300, '★ NEW BEST!  Level ' + this.level + ' ★', {
-        fontFamily: 'monospace', fontSize: '22px', color: '#ffe082', fontStyle: 'bold',
+        fontFamily: 'monospace', fontSize: FS(22), color: '#ffe082', fontStyle: 'bold',
         stroke: '#2a2030', strokeThickness: 4,
       }).setOrigin(0.5).setDepth(201).setScale(0.5).setAlpha(0);
       this.tweens.add({ targets: best, scale: 1, alpha: 1, duration: 280, ease: 'Back.out', delay: 200 });
       o.push(best);
     } else {
       o.push(this.add.text(GW / 2, 300, 'Best: Level ' + this.runStartBest, {
-        fontFamily: 'monospace', fontSize: '16px', color: '#c9b8d8',
+        fontFamily: 'monospace', fontSize: FS(16), color: '#c9b8d8',
       }).setOrigin(0.5).setDepth(201));
     }
 
@@ -1370,7 +1371,7 @@ class GameScene extends Phaser.Scene {
       bg.fillStyle(fill, 1); bg.fillRoundedRect(-100, -28, 200, 56, 10);
       bg.lineStyle(3, stroke, 1); bg.strokeRoundedRect(-100, -28, 200, 56, 10);
       const label = this.add.text(0, 0, text, {
-        fontFamily: 'monospace', fontSize: '24px', color: '#fff', fontStyle: 'bold',
+        fontFamily: 'monospace', fontSize: FS(24), color: '#fff', fontStyle: 'bold',
       }).setOrigin(0.5);
       btn.add([bg, label]);
       const hit = this.add.rectangle(x, 360, 200, 56).setDepth(202).setInteractive({ useHandCursor: true });
@@ -1407,24 +1408,24 @@ class GameScene extends Phaser.Scene {
     }
     const top = WALL_BOTTOM - 30;
     if (t.pattern === 'stripes') {
-      g.fillStyle(0xffffff, 0.05);
+      g.fillStyle(0xffffff, 0.05 * WALL_DIM);
       for (let x = 20; x < GW; x += 40) g.fillRect(x, 0, 16, top);
     } else if (t.pattern === 'brick') {
-      g.lineStyle(2, 0x000000, 0.22);
+      g.lineStyle(2, 0x000000, 0.22 * WALL_DIM);
       for (let y = 0, row = 0; y < top; y += 16, row++) {
         g.beginPath(); g.moveTo(0, y); g.lineTo(GW, y); g.strokePath();
         const off = (row % 2) ? 20 : 0;
         for (let x = off; x < GW; x += 40) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 16); g.strokePath(); }
       }
-      g.fillStyle(0xffffff, 0.04);
+      g.fillStyle(0xffffff, 0.04 * WALL_DIM);
       for (let y = 1, row = 0; y < top; y += 16, row++) {
         const off = (row % 2) ? 20 : 0;
         for (let x = off + 1; x < GW; x += 40) g.fillRect(x, y, 38, 6);
       }
     } else if (t.pattern === 'panel') {
-      g.lineStyle(3, 0x000000, 0.20);
+      g.lineStyle(3, 0x000000, 0.20 * WALL_DIM);
       for (let x = 30; x < GW; x += 60) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, top); g.strokePath(); }
-      g.fillStyle(0xffffff, 0.05);
+      g.fillStyle(0xffffff, 0.05 * WALL_DIM);
       for (let x = 32; x < GW; x += 60) g.fillRect(x, 0, 3, top);
     }
     // Chair rail + baseboard (tinted, theme-agnostic).
@@ -1499,7 +1500,7 @@ class GameScene extends Phaser.Scene {
     const g = this.add.graphics().setDepth(3);
     g.lineStyle(3, 0xff8ad6, 1); g.strokeRoundedRect(x - 60, y - 21, 120, 42, 10);
     const t = this.add.text(x, y, 'OPEN', {
-      fontFamily: 'monospace', fontSize: '22px', color: '#ffd0f2', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(22), color: '#ffd0f2', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(4);
     t.setShadow(0, 0, '#ff66cc', 10, true, true);
   }
@@ -1565,15 +1566,15 @@ class GameScene extends Phaser.Scene {
     this.storeUI.push(panel);
 
     this.storeUI.push(this.add.text(cx - pw / 2 + 24, cy - ph / 2 + 18, '🛍  STORE', {
-      fontFamily: 'monospace', fontSize: '26px', color: '#f4efe6', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(26), color: '#f4efe6', fontStyle: 'bold',
     }).setDepth(202));
     this.storeUI.push(this.add.image(cx + pw / 2 - 168, cy - ph / 2 + 32, 'coin').setScale(3).setDepth(202));
     this.storeUI.push(this.add.text(cx + pw / 2 - 150, cy - ph / 2 + 20, this.coins + ' coins', {
-      fontFamily: 'monospace', fontSize: '20px', color: '#ffe082', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(20), color: '#ffe082', fontStyle: 'bold',
     }).setDepth(202));
 
     const close = this.add.text(cx + pw / 2 - 22, cy - ph / 2 + 14, '✕', {
-      fontFamily: 'monospace', fontSize: '24px', color: '#e5564d', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(24), color: '#e5564d', fontStyle: 'bold',
     }).setOrigin(1, 0).setDepth(202).setInteractive({ useHandCursor: true });
     close.on('pointerdown', () => this.closeStore());
     this.storeUI.push(close);
@@ -1589,7 +1590,7 @@ class GameScene extends Phaser.Scene {
       const bg = this.add.graphics();
       bg.fillStyle(active ? 0x6a5490 : 0x352b48, 1); bg.fillRoundedRect(-w / 2, -16, w, 32, 8);
       const lt = this.add.text(0, 0, label, {
-        fontFamily: 'monospace', fontSize: '14px', color: active ? '#fff' : '#b9a6e0', fontStyle: 'bold',
+        fontFamily: 'monospace', fontSize: FS(14), color: active ? '#fff' : '#b9a6e0', fontStyle: 'bold',
       }).setOrigin(0.5);
       tb.add([bg, lt]);
       const tbHit = this.add.rectangle(tx + w / 2, ty, w, 32).setDepth(203).setInteractive({ useHandCursor: true });
@@ -1638,7 +1639,7 @@ class GameScene extends Phaser.Scene {
     } else { // staff
       if (!this.employeesUnlocked()) {
         this.storeUI.push(this.add.text(cx, cy + 10, '🔒 Staff unlocks after\nclearing Level 10', {
-          fontFamily: 'monospace', fontSize: '16px', color: '#9a8fb0', fontStyle: 'bold', align: 'center',
+          fontFamily: 'monospace', fontSize: FS(16), color: '#9a8fb0', fontStyle: 'bold', align: 'center',
         }).setOrigin(0.5).setDepth(202));
         return;
       }
@@ -1696,17 +1697,17 @@ class GameScene extends Phaser.Scene {
     } else if (info.thumbType === 'tex') {
       cont.add(this.add.image(0, thumbY, info.thumbVal).setScale(2.4));
     } else {
-      cont.add(this.add.text(0, thumbY, info.thumbVal, { fontSize: '36px' }).setOrigin(0.5));
+      cont.add(this.add.text(0, thumbY, info.thumbVal, { fontSize: FS(36) }).setOrigin(0.5));
     }
 
     cont.add(this.add.text(0, h / 2 - 56, info.title, {
-      fontFamily: 'monospace', fontSize: '15px', color: '#f4efe6', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(15), color: '#f4efe6', fontStyle: 'bold',
       align: 'center', wordWrap: { width: w - 16 },
     }).setOrigin(0.5));
 
     if (info.subline) {
       cont.add(this.add.text(0, h / 2 - 38, info.subline, {
-        fontFamily: 'monospace', fontSize: '12px', color: info.sublineColor || '#9a8fb0', fontStyle: 'bold',
+        fontFamily: 'monospace', fontSize: FS(12), color: info.sublineColor || '#9a8fb0', fontStyle: 'bold',
       }).setOrigin(0.5));
     }
 
@@ -1718,7 +1719,7 @@ class GameScene extends Phaser.Scene {
     else if (info.owned) { statusText = 'OWNED'; statusColor = '#9a8fb0'; clickable = false; }
     else { statusText = info.price + ' coins'; statusColor = affordable ? '#ffe082' : '#e5564d'; clickable = affordable; }
     cont.add(this.add.text(0, h / 2 - 20, statusText, {
-      fontFamily: 'monospace', fontSize: '14px', color: statusColor, fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(14), color: statusColor, fontStyle: 'bold',
     }).setOrigin(0.5));
 
     const cardHit = this.add.rectangle(x, y, w, h).setDepth(203).setInteractive({ useHandCursor: clickable });

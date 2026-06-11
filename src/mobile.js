@@ -29,3 +29,15 @@ const landscapeAspect = longSide / shortSide;
 window.GAME_WIDTH = MOBILE_MODE
   ? Math.round(Math.min(1200, Math.max(800, 600 * landscapeAspect)))
   : 800;
+
+// On mobile the canvas is squeezed into a much shorter viewport height than
+// the fixed 600 logical units, so everything renders smaller on screen than
+// on desktop. Bump text/icon sizes up a bit to keep them legible.
+const UI_SCALE = MOBILE_MODE ? 1.18 : 1;
+function FS(px) { return Math.round(px * UI_SCALE) + 'px'; }
+
+// Background patterns (wall stripes/bricks/panels, vignette) compete with
+// the UI for attention on small screens — dim them down on mobile so text
+// stands out more.
+const WALL_DIM = MOBILE_MODE ? 0.5 : 1;
+const VIGNETTE_ALPHA = MOBILE_MODE ? 0.93 : 0.85;

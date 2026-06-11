@@ -24,7 +24,7 @@ class MenuScene extends Phaser.Scene {
       bg.fillRect(0, i, W, 2);
     }
     // Subtle vertical stripe texture
-    bg.fillStyle(0xffffff, 0.05);
+    bg.fillStyle(0xffffff, 0.05 * WALL_DIM);
     for (let x = 20; x < W; x += 40) bg.fillRect(x, 0, 16, H);
 
     // ── Warm centre glow behind the title ──
@@ -45,15 +45,15 @@ class MenuScene extends Phaser.Scene {
     // Render the word separately so setOrigin(0.5) centres on the letters only,
     // then measure its width to place the emoji flush to the left of it.
     const titleText = this.add.text(W / 2, 72, 'BREWHAVEN', {
-      fontFamily: 'monospace', fontSize: '52px', color: '#f4efe6', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(52), color: '#f4efe6', fontStyle: 'bold',
       stroke: '#2a2030', strokeThickness: 8,
     }).setOrigin(0.5).setDepth(2);
     this.add.text(W / 2 - titleText.width / 2 - 32, 72, '☕', {
-      fontSize: '40px',
+      fontSize: FS(40),
     }).setOrigin(0.5).setDepth(2);
 
     this.add.text(W / 2, 134, 'A pixel coffee shop', {
-      fontFamily: 'monospace', fontSize: '18px', color: '#c9b8d8',
+      fontFamily: 'monospace', fontSize: FS(18), color: '#c9b8d8',
       stroke: '#2a2030', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(2);
 
@@ -65,7 +65,7 @@ class MenuScene extends Phaser.Scene {
     // ── Best level reached (only once there's a record to show) ──
     if (Save.data.bestLevel > 0) {
       this.add.text(W / 2, 198, 'Best: Level ' + Save.data.bestLevel, {
-        fontFamily: 'monospace', fontSize: '14px', color: '#ffe082', fontStyle: 'bold',
+        fontFamily: 'monospace', fontSize: FS(14), color: '#ffe082', fontStyle: 'bold',
         stroke: '#2a2030', strokeThickness: 3,
       }).setOrigin(0.5).setDepth(2);
     }
@@ -79,7 +79,7 @@ class MenuScene extends Phaser.Scene {
     card.strokeRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 14);
 
     this.add.text(cx, cy - ch / 2 + 20, 'HOW TO PLAY', {
-      fontFamily: 'monospace', fontSize: '13px', color: '#ffe082', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(13), color: '#ffe082', fontStyle: 'bold',
       stroke: '#2a2030', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(3);
 
@@ -100,8 +100,8 @@ class MenuScene extends Phaser.Scene {
     const colDesc = cx - cw / 2 + 246;
     rows.forEach(([key, desc], i) => {
       const ry = cy - ch / 2 + 56 + i * 36;
-      this.add.text(colKey,  ry, key,  { fontFamily: 'monospace', fontSize: '12px', color: '#ffe082', fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(3);
-      this.add.text(colDesc, ry, desc, { fontFamily: 'monospace', fontSize: '12px', color: '#c9b8d8' }).setOrigin(0, 0.5).setDepth(3);
+      this.add.text(colKey,  ry, key,  { fontFamily: 'monospace', fontSize: FS(12), color: '#ffe082', fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(3);
+      this.add.text(colDesc, ry, desc, { fontFamily: 'monospace', fontSize: FS(12), color: '#c9b8d8' }).setOrigin(0, 0.5).setDepth(3);
     });
 
     // ── Start Game button ──
@@ -113,7 +113,7 @@ class MenuScene extends Phaser.Scene {
     bbg.lineStyle(3, 0x6abf5a, 1);
     bbg.strokeRoundedRect(-bw / 2, -bh / 2, bw, bh, 10);
     const blabel = this.add.text(0, 0, '▶  START GAME', {
-      fontFamily: 'monospace', fontSize: '22px', color: '#ffffff', fontStyle: 'bold',
+      fontFamily: 'monospace', fontSize: FS(22), color: '#ffffff', fontStyle: 'bold',
       stroke: '#2a2030', strokeThickness: 4,
     }).setOrigin(0.5);
     btn.add([bbg, blabel]);
@@ -130,11 +130,11 @@ class MenuScene extends Phaser.Scene {
 
     // ── Footer hint ──
     this.add.text(W / 2, 534, 'Hit the green zone. Keep the queue moving. Don\'t lose all 3 hearts.', {
-      fontFamily: 'monospace', fontSize: '11px', color: '#6a5878',
+      fontFamily: 'monospace', fontSize: FS(11), color: '#6a5878',
     }).setOrigin(0.5).setDepth(4);
 
     // ── Atmosphere ──
-    this.add.image(W / 2, H / 2, 'vignette').setDisplaySize(W, H).setAlpha(0.85).setDepth(5);
+    this.add.image(W / 2, H / 2, 'vignette').setDisplaySize(W, H).setAlpha(VIGNETTE_ALPHA).setDepth(5);
     this.add.particles(0, 0, 'dust', {
       x: { min: 0, max: W }, y: { min: 0, max: H },
       speedY: { min: -8, max: -2 }, speedX: { min: -4, max: 4 },
