@@ -218,6 +218,7 @@ class GameScene extends Phaser.Scene {
     this.buildPourStation();
     this.buildUI();
     this.bindInput();
+    if (MOBILE_MODE) this.buildMobileControls();
 
     if (DEV_MODE && DEV_START_LEVEL) {
       this.startLevel(DEV_START_LEVEL, true);
@@ -277,7 +278,11 @@ class GameScene extends Phaser.Scene {
     } else if (n === 3) {
       this.time.delayedCall(1000, () => this.showTutorial(
         STATIONS[1].x, COUNTER_TOP - 150,
-        'The drip machine can now\nalso serve Tea — use it to\nfill tea orders too!'
+        'The drip machine can now\nalso serve Tea — use it to\nfill tea orders too!',
+        () => this.showTutorial(
+          GW / 2, COUNTER_TOP - 150,
+          'Tip: open the STORE\n(top right) anytime to\nspend coins on upgrades,\nwalls, maker skins, and\ndecorations!'
+        )
       ));
     } else if (n === 5) {
       this.time.delayedCall(1300, () => this.showTutorial(
@@ -631,6 +636,37 @@ class GameScene extends Phaser.Scene {
       kb.on('keydown-PLUS', () => this.devJumpToLevel(this.level + 1));
       kb.on('keydown-MINUS', () => this.devJumpToLevel(this.level - 1));
     }
+  }
+
+  // On-screen touch controls for mobile: a left-arrow + circular pour button
+  // on the left edge, and a right-arrow on the right edge. Sit on top of the
+  // playfield (depth 150) but below modal overlays (store/tutorial/banners
+  // all sit at depth 158+), so they're auto-disabled while those are open.
+  buildMobileControls() {
+    const mkButton = (x, y, r, icon, fontSize) => {
+      const cont = this.add.container(x, y).setDepth(150).setAlpha(0.55);
+      const bg = this.add.graphics();
+      bg.fillStyle(0x1b1620, 0.5);
+      bg.fillCircle(0, 0, r);
+      bg.lineStyle(2, 0xf4efe6, 0.6);
+      bg.strokeCircle(0, 0, r);
+      const label = this.add.text(0, 0, icon, {
+        fontFamily: 'monospace', fontSize: fontSize, color: '#f4efe6', fontStyle: 'bold',
+      }).setOrigin(0.5);
+      cont.add([bg, label]);
+      const hit = this.add.circle(x, y, r).setDepth(151).setInteractive({ useHandCursor: true });
+      hit.on('pointerdown', () => { this.tweens.add({ targets: cont, alpha: 0.85, scale: 0.92, duration: 60 }); });
+      hit.on('pointerup', () => { this.tweens.add({ targets: cont, alpha: 0.55, scale: 1, duration: 100 }); });
+      hit.on('pointerout', () => { this.tweens.add({ targets: cont, alpha: 0.55, scale: 1, duration: 100 }); });
+      return hit;
+    };
+
+    const arrowY = GH - 50, pourY = GH - 150;
+    const leftX = 60, rightX = GW - 60;
+
+    mkButton(leftX, arrowY, 32, '◀', '26px').on('pointerdown', () => this.stepStation(-1));
+    mkButton(rightX, arrowY, 32, '▶', '26px').on('pointerdown', () => this.stepStation(1));
+    mkButton(leftX, pourY, 44, '☕', '32px').on('pointerdown', () => this.startPour());
   }
 
   // Step one station left/right with the keys (skips nothing — unlocked
@@ -1013,14 +1049,27 @@ class GameScene extends Phaser.Scene {
   // Juice helpers
   // ===========================================================================
   // A small speech-bubble popup pointing down at a station, for one-time tips.
-  showTutorial(x, y, text) {
+  // Pauses the level (spawns + customer patience) until the player taps
+  // "GOT IT", so they have time to read it. `onClose` fires once dismissed —
+  // used to chain a second tutorial right after this one closes.
+  showTutorial(x, y, text, onClose) {
+    this.state = 'tutorial';
+    if (this.spawnTimer) this.spawnTimer.paused = true;
+    this.customers.forEach((c) => this.tweens.getTweensOf(c.container).forEach((tw) => tw.pause()));
+
+    const overlay = this.add.rectangle(GW / 2, GH / 2, GW, GH, 0x0a0710, 0.35).setDepth(158).setInteractive();
+
     const cont = this.add.container(x, y).setDepth(160).setAlpha(0).setScale(0.8);
     const t = this.add.text(0, 0, text, {
       fontFamily: 'monospace', fontSize: '13px', color: '#2a2030', fontStyle: 'bold',
       align: 'center', wordWrap: { width: 190 },
     }).setOrigin(0.5);
-    const padX = 14, padY = 10;
-    const w = t.width + padX * 2, h = t.height + padY * 2;
+
+    const padX = 14, padTop = 10, btnGap = 10, btnW = 96, btnH = 30;
+    const w = Math.max(t.width + padX * 2, btnW + 28);
+    const h = t.height + padTop * 2 + btnGap + btnH + 14;
+    t.setPosition(0, -h / 2 + padTop + t.height / 2);
+
     const bg = this.add.graphics();
     bg.fillStyle(0xfff4d6, 1);
     bg.fillRoundedRect(-w / 2, -h / 2, w, h, 8);
@@ -1028,9 +1077,39 @@ class GameScene extends Phaser.Scene {
     bg.lineStyle(3, 0xffd166, 1);
     bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 8);
     bg.strokeTriangle(-8, h / 2 - 1, 8, h / 2 - 1, 0, h / 2 + 12);
-    cont.add([bg, t]);
+
+    const btnY = h / 2 - 8 - btnH / 2;
+    const btnBg = this.add.graphics();
+    btnBg.fillStyle(0x3a5a3a, 1);
+    btnBg.fillRoundedRect(-btnW / 2, btnY - btnH / 2, btnW, btnH, 8);
+    btnBg.lineStyle(2, 0x6abf5a, 1);
+    btnBg.strokeRoundedRect(-btnW / 2, btnY - btnH / 2, btnW, btnH, 8);
+    const btnLabel = this.add.text(0, btnY, 'GOT IT', {
+      fontFamily: 'monospace', fontSize: '13px', color: '#fff', fontStyle: 'bold',
+    }).setOrigin(0.5);
+    cont.add([bg, t, btnBg, btnLabel]);
+
+    const btnHit = this.add.rectangle(x, y + btnY, btnW, btnH).setDepth(161).setInteractive({ useHandCursor: true });
+    btnHit.on('pointerover', () => { this.tweens.add({ targets: [btnBg, btnLabel], scale: 1.05, duration: 80 }); });
+    btnHit.on('pointerout', () => { this.tweens.add({ targets: [btnBg, btnLabel], scale: 1, duration: 80 }); });
+    btnHit.on('pointerdown', () => {
+      btnHit.disableInteractive();
+      SFX.blip(720, 0.05);
+      this.tweens.add({
+        targets: cont, alpha: 0, scale: 0.8, duration: 250,
+        onComplete: () => {
+          cont.destroy();
+          overlay.destroy();
+          btnHit.destroy();
+          this.state = 'playing';
+          if (this.spawnTimer) this.spawnTimer.paused = false;
+          this.customers.forEach((c) => this.tweens.getTweensOf(c.container).forEach((tw) => tw.resume()));
+          if (onClose) onClose();
+        },
+      });
+    });
+
     this.tweens.add({ targets: cont, alpha: 1, scale: 1, duration: 300, ease: 'Back.out' });
-    this.tweens.add({ targets: cont, alpha: 0, scale: 0.8, delay: 4500, duration: 400, onComplete: () => cont.destroy() });
   }
 
   floatingText(x, y, text, color) {

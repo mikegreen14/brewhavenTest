@@ -118,6 +118,15 @@
         + 'some drinks need a milk top-up at a second station • don\'t lose all 3 hearts!';
     }
 
+    // Unlock the Web Audio API on the very first user gesture. Listening
+    // directly on the document (rather than through Phaser's input queue,
+    // which dispatches on the next frame) ensures this runs synchronously
+    // within the trusted gesture, which strict mobile browsers require.
+    const unlockAudio = () => SFX.unlock();
+    ['pointerdown', 'touchend', 'keydown'].forEach((evt) =>
+      document.addEventListener(evt, unlockAudio, { once: true, passive: true })
+    );
+
     // Fullscreen toggle: handy on mobile to hide the browser chrome.
     const fullscreenBtn = document.getElementById('fullscreen-btn');
     if (MOBILE_MODE && document.documentElement.requestFullscreen) {
