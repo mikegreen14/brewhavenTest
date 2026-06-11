@@ -10,7 +10,7 @@ const config = {
   pixelArt: true,
   roundPixels: true,
   backgroundColor: '#1b1620',
-  scene: [BootScene, MenuScene, GameScene],
+  scene: [BootScene, MenuScene, SetupScene, GameScene],
   scale: {
     mode: Phaser.Scale.FIT,
     // #game already centers the canvas via flexbox; Phaser's own

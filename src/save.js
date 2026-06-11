@@ -13,6 +13,10 @@ const Save = (() => {
   const DEFAULTS = {
     v: 1,
     bestLevel: 0,
+    setupDone: false,
+    shopName: '',
+    baristaName: '',
+    apronColor: 'teal',
   };
 
   let available = false;

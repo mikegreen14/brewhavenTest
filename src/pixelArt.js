@@ -317,6 +317,18 @@ const SPRITES = {
   ],
 };
 
+// Preset apron colors for the player's barista, chosen at first-time setup.
+// Each entry recolors the barista sprite's apron palette slots (V/v/U =
+// main/shadow/highlight). 'teal' matches the original sprite colors.
+const APRON_COLORS = [
+  { id: 'teal',    name: 'Teal',    swatch: 0x2f9e8f, V: '#2f9e8f', v: '#1f6e63', U: '#46c2b1' },
+  { id: 'red',     name: 'Red',     swatch: 0xc0584f, V: '#c0584f', v: '#8a3a33', U: '#e0837a' },
+  { id: 'blue',    name: 'Blue',    swatch: 0x4f8de0, V: '#4f8de0', v: '#34619c', U: '#8ab4ed' },
+  { id: 'mustard', name: 'Mustard', swatch: 0xd9a441, V: '#d9a441', v: '#a87a28', U: '#f0c97a' },
+  { id: 'green',   name: 'Green',   swatch: 0x5a9e4a, V: '#5a9e4a', v: '#3e7332', U: '#8ec97f' },
+  { id: 'purple',  name: 'Purple',  swatch: 0x8a6bd0, V: '#8a6bd0', v: '#5f4a96', U: '#b3a0e8' },
+];
+
 const CUSTOMER_SHIRTS = [
   '#e0683f', '#4f8de0', '#6abf5a', '#c45ec4',
   '#e0c14f', '#5ec4bf', '#e0567f', '#8a6bd0',
@@ -407,6 +419,12 @@ function buildAllTextures(scene) {
   CUSTOMER_SHIRTS.forEach((shirt, i) => {
     const pal = Object.assign({}, PAL, { T: shirt });
     makePixelTexture(scene, 'customer' + i, CUSTOMER_GRID, pal);
+  });
+
+  // Apron color variants of the barista, picked during first-time setup.
+  APRON_COLORS.forEach((c) => {
+    const pal = Object.assign({}, PAL, { V: c.V, v: c.v, U: c.U });
+    makePixelTexture(scene, 'barista_' + c.id, SPRITES.barista, pal);
   });
 
   // Pour-stream droplet (white so we can tint per-drink at runtime).

@@ -125,7 +125,8 @@ class MenuScene extends Phaser.Scene {
       SFX.unlock();
       SFX.cash();
       this.cameras.main.fadeOut(380, 0, 0, 0);
-      this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('GameScene'));
+      this.cameras.main.once('camerafadeoutcomplete', () =>
+        this.scene.start(Save.data.setupDone ? 'GameScene' : 'SetupScene'));
     });
 
     // ── Footer hint ──

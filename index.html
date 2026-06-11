@@ -58,6 +58,22 @@
       opacity: 0.45;
       pointer-events: none;
     }
+    /* First-time setup wizard: DOM text input overlaid on the canvas. */
+    #setup-input {
+      position: fixed;
+      display: none;
+      z-index: 600;
+      font-family: monospace;
+      font-weight: bold;
+      text-align: center;
+      background: #fff4d6;
+      color: #2a2030;
+      border: 3px solid #ffd166;
+      border-radius: 8px;
+      outline: none;
+      box-sizing: border-box;
+      padding: 0 8px;
+    }
     /* Shown on small viewports while the device is in portrait orientation. */
     #rotate-overlay {
       display: none;
@@ -88,6 +104,7 @@
 </head>
 <body>
   <div id="game"></div>
+  <input id="setup-input" type="text" autocomplete="off" spellcheck="false" />
   <button id="fullscreen-btn" title="Toggle fullscreen">⛶</button>
   <div id="hint">A/D or ←/→ to move • click a station (or hold SPACE) to pour • bubble border = which station next • stop in the bright green zone • some drinks need a milk top-up at a second station • don't lose all 3 hearts!</div>
   <div id="rotate-overlay">
@@ -107,6 +124,7 @@
   <script src="src/pixelArt.js"></script>
   <script src="src/scenes/BootScene.js"></script>
   <script src="src/scenes/MenuScene.js"></script>
+  <script src="src/scenes/SetupScene.js"></script>
   <script src="src/scenes/GameScene.js"></script>
   <script src="src/main.js"></script>
 

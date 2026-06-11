@@ -267,8 +267,15 @@ class GameScene extends Phaser.Scene {
     this.showBanner('LEVEL ' + n, '#ffe082', 'Serve ' + this.cfg.quota + ' drinks');
     if (n === 1) {
       this.time.delayedCall(1000, () => this.showTutorial(
-        STATIONS[0].x, COUNTER_TOP - 150,
-        'This is your espresso\nmachine — use it to fill\nespresso orders!'
+        GW / 2, COUNTER_TOP - 150,
+        'Welcome to ' + (Save.data.shopName || 'Brewhaven') + ', '
+          + (Save.data.baristaName || 'Barista') + '!\n'
+          + 'When customers walk in, their\norder appears in a bubble above\n'
+          + 'their head — match the drink,\nthen pour it at the right station.',
+        () => this.showTutorial(
+          STATIONS[0].x, COUNTER_TOP - 150,
+          'This is your espresso\nmachine — use it to fill\nespresso orders!'
+        )
       ));
     } else if (n === 2) {
       this.time.delayedCall(1300, () => this.showTutorial(
@@ -382,7 +389,7 @@ class GameScene extends Phaser.Scene {
     this.drawFrame(720, 150, 56, 44, 0x6abf5a);
 
     // --- Wall fixtures (unchanged positions) ---
-    this.add.image(310, 70, 'menu').setScale(4).setDepth(1);
+    this.drawShopBanner();
     const rope = this.add.graphics().setDepth(0);
     rope.lineStyle(3, 0x241b2e, 1);
     rope.beginPath(); rope.moveTo(190, 0); rope.lineTo(190, 28); rope.strokePath();
@@ -417,7 +424,8 @@ class GameScene extends Phaser.Scene {
 
     // --- Barista (+ shadow that follows in update) ---
     this.baristaShadow = this.add.image(STATIONS[0].x, BARISTA_Y, 'softshadow').setScale(1.2, 0.4).setAlpha(0.4).setDepth(8);
-    this.barista = this.add.image(STATIONS[0].x, BARISTA_Y, 'barista').setOrigin(0.5, 1).setScale(4).setDepth(9);
+    this.baristaTexture = 'barista_' + (Save.data.apronColor || 'teal');
+    this.barista = this.add.image(STATIONS[0].x, BARISTA_Y, this.baristaTexture).setOrigin(0.5, 1).setScale(4).setDepth(9);
 
     // --- Floating dust motes for atmosphere ---
     this.add.particles(0, 0, 'dust', {
@@ -433,6 +441,33 @@ class GameScene extends Phaser.Scene {
     this.add.text(GW - 16, 14, 'BREWHAVEN', {
       fontFamily: 'monospace', fontSize: FS(20), color: '#f4efe6', fontStyle: 'bold',
     }).setOrigin(1, 0).setDepth(100).setAlpha(0.85);
+  }
+
+  // The shop's name on a wooden sign, hung between the two ceiling ropes
+  // at x=190/430 — replaces the old generic "menu" chalkboard decor.
+  drawShopBanner() {
+    const cx = 310, cy = 70, bw = 240, bh = 50;
+    const g = this.add.graphics().setDepth(1);
+    g.fillStyle(0x4a3219, 1);
+    g.fillRoundedRect(cx - bw / 2, cy - bh / 2, bw, bh, 8);
+    g.fillStyle(0x6b461f, 1);
+    g.fillRoundedRect(cx - bw / 2 + 4, cy - bh / 2 + 4, bw - 8, bh - 8, 6);
+    g.lineStyle(2, 0xb07f4a, 1);
+    g.strokeRoundedRect(cx - bw / 2, cy - bh / 2, bw, bh, 8);
+
+    const name = Save.data.shopName || 'Brewhaven';
+    const text = this.add.text(cx, cy, name, {
+      fontFamily: 'monospace', fontSize: FS(20), color: '#f4efe6', fontStyle: 'bold',
+      stroke: '#2a2030', strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(2);
+
+    // Shrink the font until the name fits the sign's interior.
+    const maxWidth = bw - 24;
+    const sizes = [20, 18, 16, 14, 12, 11];
+    for (const sz of sizes) {
+      text.setFontSize(parseInt(FS(sz), 10));
+      if (text.width <= maxWidth) break;
+    }
   }
 
   // A small wall picture frame with a gradient "canvas" inside.
@@ -466,7 +501,7 @@ class GameScene extends Phaser.Scene {
     if (this.employee.sprite) return;
     const x = (this.employee.station != null ? STATIONS[this.employee.station].x : STATIONS[0].x) + 22;
     this.employee.shadow = this.add.image(x, BARISTA_Y, 'softshadow').setScale(1.2, 0.4).setAlpha(0.4).setDepth(8);
-    this.employee.sprite = this.add.image(x, BARISTA_Y, 'barista').setOrigin(0.5, 1).setScale(4).setDepth(9)
+    this.employee.sprite = this.add.image(x, BARISTA_Y, this.baristaTexture).setOrigin(0.5, 1).setScale(4).setDepth(9)
       .setTint(0xbfe0ff).setFlipX(true);
   }
 
