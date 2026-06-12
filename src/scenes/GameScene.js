@@ -146,6 +146,17 @@ const WALL_THEMES = {
 // pixelArt.js (SKIN_TIER_PALETTES).
 const STATION_SKIN_TIERS = ['black', 'mint', 'copper', 'silver', 'gold'];
 
+// ---- Perk-card rarity tiers ("casino roll" between levels) ----------------
+// Each level-up card independently rolls one of these tiers (weights sum to
+// 100); higher tiers scale the perk's effect by `mult` (see scaleCardAmt).
+const CARD_TIERS = [
+  { id: 'bronze',   label: 'BRONZE',   weight: 50, mult: 1,   color: 0xcd7f32, glow: 0xe3a96a },
+  { id: 'silver',   label: 'SILVER',   weight: 30, mult: 1.3, color: 0xc7d0da, glow: 0xeaf0f7 },
+  { id: 'gold',     label: 'GOLD',     weight: 15, mult: 1.6, color: 0xffd700, glow: 0xfff3a0 },
+  { id: 'platinum', label: 'PLATINUM', weight: 5,  mult: 2.2, color: 0x7df9ff, glow: 0xd0feff },
+];
+const CARD_TIER_TOTAL_WEIGHT = CARD_TIERS.reduce((sum, t) => sum + t.weight, 0);
+
 class GameScene extends Phaser.Scene {
   constructor() {
     super('GameScene');
@@ -1318,18 +1329,78 @@ class GameScene extends Phaser.Scene {
   // ===========================================================================
   // Perk cards (between levels)
   // ===========================================================================
+  // Weighted random pick from CARD_TIERS (50/30/15/5 by default).
+  rollCardTier() {
+    let r = Math.random() * CARD_TIER_TOTAL_WEIGHT;
+    for (const t of CARD_TIERS) {
+      if (r < t.weight) return t;
+      r -= t.weight;
+    }
+    return CARD_TIERS[0];
+  }
+
+  // Scales a perk card's base amount by its rolled tier multiplier, rounded
+  // to a step that makes sense for that stat (whole hearts, tenths of a
+  // second of patience, etc.) so the displayed numbers stay tidy.
+  scaleCardAmt(stat, baseAmt, mult) {
+    const raw = baseAmt * mult;
+    switch (stat) {
+      case 'patience': return Math.round(raw * 10) / 10;
+      case 'combo': return Math.round(raw * 1000) / 1000;
+      case 'heart': return Math.max(1, Math.round(raw));
+      case 'feet': case 'coins': return Math.round(raw / 5) * 5;
+      default: return raw;
+    }
+  }
+
   cardPool() {
-    const all = [
-      { title: 'Calm Crowd', desc: '+0.6s customer patience', perk: { stat: 'patience', amt: 0.6 } },
-      { title: 'Quick Feet', desc: 'Move between makers faster', perk: { stat: 'feet', amt: 70 } },
-      { title: 'Combo Pro', desc: 'Combos pay even more', perk: { stat: 'combo', amt: 0.05 } },
-      { title: 'Extra Heart', desc: '+1 max heart & heal one', perk: { stat: 'heart', amt: 1 } },
-    ].filter((c) => !this.abilityMaxed(c.perk.stat));
-    all.push({ title: 'Windfall', desc: '+80 coins to spend in the Store', apply: () => { this.coins += 80; this.updateCoinText(); } });
+    const base = [
+      { title: 'Calm Crowd', stat: 'patience', baseAmt: 0.6,
+        desc: (a) => `+${a.toFixed(1)}s customer patience` },
+      { title: 'Quick Feet', stat: 'feet', baseAmt: 70,
+        desc: () => 'Move between makers faster' },
+      { title: 'Combo Pro', stat: 'combo', baseAmt: 0.05,
+        desc: () => 'Combos pay even more' },
+      { title: 'Extra Heart', stat: 'heart', baseAmt: 1,
+        desc: (a) => `+${a} max heart${a > 1 ? 's' : ''} & heal ${a > 1 ? 'them' : 'one'}` },
+    ].filter((c) => !this.abilityMaxed(c.stat));
+
+    const all = base.map((c) => {
+      const tier = this.rollCardTier();
+      const amt = this.scaleCardAmt(c.stat, c.baseAmt, tier.mult);
+      return { title: c.title, desc: c.desc(amt), tier, perk: { stat: c.stat, amt } };
+    });
+
+    const windfallTier = this.rollCardTier();
+    const windfallAmt = this.scaleCardAmt('coins', 80, windfallTier.mult);
+    all.push({
+      title: 'Windfall', desc: `+${windfallAmt} coins to spend in the Store`, tier: windfallTier,
+      apply: () => { this.coins += windfallAmt; this.updateCoinText(); },
+    });
     if (this.lives < this.maxLives) {
-      all.push({ title: 'Second Wind', desc: 'Refill all hearts', apply: () => { this.lives = this.maxLives; this.updateHearts(); } });
+      // Always Bronze — refilling hearts is binary, so a higher tier
+      // wouldn't change the effect and would just be misleading.
+      all.push({ title: 'Second Wind', desc: 'Refill all hearts', tier: CARD_TIERS[0],
+        apply: () => { this.lives = this.maxLives; this.updateHearts(); } });
     }
     return Phaser.Utils.Array.Shuffle(all).slice(0, 3);
+  }
+
+  // Casino-style "slot reel" reveal: ticks the badge through random tiers
+  // (slowing down) before landing on `finalTier`, then calls onDone.
+  runCardRoll(drawBadge, finalTier, onDone) {
+    const delays = [60, 60, 70, 80, 100, 130, 170, 220];
+    let i = 0;
+    const tick = () => {
+      const last = i === delays.length;
+      const tier = last ? finalTier : CARD_TIERS[Phaser.Math.Between(0, CARD_TIERS.length - 1)];
+      drawBadge(tier);
+      SFX.blip(420 + i * 35, 0.04, 'square', 0.08);
+      if (last) { onDone(); return; }
+      this.time.delayedCall(delays[i], tick);
+      i++;
+    };
+    tick();
   }
 
   showCardPick() {
@@ -1347,24 +1418,50 @@ class GameScene extends Phaser.Scene {
     const cw = 200, ch = 240, gap = 30;
     const totalW = cards.length * cw + (cards.length - 1) * gap;
     let x = (GW - totalW) / 2 + cw / 2;
-    cards.forEach((card) => {
+    cards.forEach((card, idx) => {
       const cont = this.add.container(x, 340).setDepth(201);
-      const bg = this.add.graphics();
-      bg.fillStyle(0x2e2438, 1); bg.fillRoundedRect(-cw / 2, -ch / 2, cw, ch, 12);
-      bg.lineStyle(3, 0xffd166, 1); bg.strokeRoundedRect(-cw / 2, -ch / 2, cw, ch, 12);
+
+      // ── Glow halo (only shown for Gold/Platinum once revealed) ──
+      const glow = this.add.graphics().setVisible(false);
+
+      // ── Back face: shown during the casino-roll tick ──
+      const backBg = this.add.graphics();
+      backBg.fillStyle(0x2e2438, 1); backBg.fillRoundedRect(-cw / 2, -ch / 2, cw, ch, 12);
+      backBg.lineStyle(3, 0x6a5490, 1); backBg.strokeRoundedRect(-cw / 2, -ch / 2, cw, ch, 12);
+      const backMark = this.add.text(0, -10, '?', {
+        fontFamily: 'monospace', fontSize: FS(48), color: '#6a5490', fontStyle: 'bold',
+      }).setOrigin(0.5);
+
+      // ── Tier badge (reused for both the rolling tick and the final reveal) ──
+      const badgeBg = this.add.graphics();
+      const badgeText = this.add.text(0, -100, '', {
+        fontFamily: 'monospace', fontSize: FS(13), color: '#2a2030', fontStyle: 'bold',
+      }).setOrigin(0.5);
+      const drawBadge = (tier) => {
+        badgeBg.clear();
+        badgeBg.fillStyle(tier.color, 1);
+        badgeBg.fillRoundedRect(-58, -111, 116, 22, 6);
+        badgeText.setText(tier.label);
+      };
+      drawBadge(CARD_TIERS[0]);
+
+      // ── Front face: the actual perk, hidden until the roll lands ──
+      const frontBg = this.add.graphics().setVisible(false);
       const title = this.add.text(0, -70, card.title, {
         fontFamily: 'monospace', fontSize: FS(20), color: '#ffe082', fontStyle: 'bold',
         align: 'center', wordWrap: { width: cw - 24 },
-      }).setOrigin(0.5);
+      }).setOrigin(0.5).setVisible(false);
       const desc = this.add.text(0, 20, card.desc, {
         fontFamily: 'monospace', fontSize: FS(14), color: '#d8d0e0',
         align: 'center', wordWrap: { width: cw - 28 },
-      }).setOrigin(0.5);
+      }).setOrigin(0.5).setVisible(false);
       const hint = this.add.text(0, ch / 2 - 26, 'PICK', {
         fontFamily: 'monospace', fontSize: FS(14), color: '#6abf5a', fontStyle: 'bold',
-      }).setOrigin(0.5);
-      cont.add([bg, title, desc, hint]);
-      const perkHit = this.add.rectangle(x, 340, cw, ch).setDepth(202).setInteractive({ useHandCursor: true });
+      }).setOrigin(0.5).setVisible(false);
+
+      cont.add([glow, backBg, backMark, frontBg, title, desc, hint, badgeBg, badgeText]);
+
+      const perkHit = this.add.rectangle(x, 340, cw, ch).setDepth(202);
       perkHit.on('pointerover', () => { this.tweens.killTweensOf(cont); this.tweens.add({ targets: cont, scale: 1.05, duration: 100 }); });
       perkHit.on('pointerout', () => { this.tweens.killTweensOf(cont); this.tweens.add({ targets: cont, scale: 1, duration: 100 }); });
       perkHit.on('pointerdown', () => {
@@ -1374,11 +1471,40 @@ class GameScene extends Phaser.Scene {
         overlay.forEach((o) => o.destroy());
         this.startLevel(this.level + 1);
       });
-      // Entrance pop.
-      cont.setScale(0.6); cont.setAlpha(0);
-      this.tweens.add({ targets: cont, scale: 1, alpha: 1, duration: 260, ease: 'Back.out', delay: 80 });
       overlay.push(cont);
       overlay.push(perkHit);
+
+      // Entrance pop, then the casino roll, then flip to reveal the card.
+      cont.setScale(0.6); cont.setAlpha(0);
+      this.tweens.add({
+        targets: cont, scale: 1, alpha: 1, duration: 260, ease: 'Back.out', delay: 80 + idx * 150,
+        onComplete: () => {
+          this.runCardRoll(drawBadge, card.tier, () => {
+            this.tweens.add({
+              targets: cont, scaleX: 0, duration: 90, ease: 'Sine.in',
+              onComplete: () => {
+                backBg.setVisible(false);
+                backMark.setVisible(false);
+                frontBg.clear();
+                frontBg.fillStyle(0x2e2438, 1); frontBg.fillRoundedRect(-cw / 2, -ch / 2, cw, ch, 12);
+                frontBg.lineStyle(4, card.tier.color, 1); frontBg.strokeRoundedRect(-cw / 2, -ch / 2, cw, ch, 12);
+                frontBg.setVisible(true);
+                title.setVisible(true); desc.setVisible(true); hint.setVisible(true);
+                if (card.tier.id === 'gold' || card.tier.id === 'platinum') {
+                  glow.clear();
+                  glow.lineStyle(6, card.tier.glow, 0.5);
+                  glow.strokeRoundedRect(-cw / 2 - 5, -ch / 2 - 5, cw + 10, ch + 10, 16);
+                  glow.setVisible(true).setAlpha(0.5);
+                  this.tweens.add({ targets: glow, alpha: { from: 0.2, to: 0.7 }, yoyo: true, repeat: -1, duration: 450 });
+                }
+                this.tweens.add({ targets: cont, scaleX: 1, duration: 120, ease: 'Back.out' });
+                SFX.ding();
+                perkHit.setInteractive({ useHandCursor: true });
+              },
+            });
+          });
+        },
+      });
       x += cw + gap;
     });
   }
