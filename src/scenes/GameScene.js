@@ -102,6 +102,35 @@ const STATION_UPGRADES = {
 // perk cards) cap out at this level for balance — bypassed in DEV_MODE.
 const ABILITY_LEVEL_CAP = 10;
 
+// ---- Rush Hour (activates every 10 levels) ----------------------------------
+const RUSH_HARD_TIMER_PATIENCE = 4;    // seconds — fixed, ignores patienceBonus
+const RUSH_ZONE_DRIFT_AMT      = 0.07; // ±fraction of cup height (Moving Target)
+const RUSH_ZONE_DRIFT_SPEED    = 700;  // ms per half-cycle
+
+const RUSH_MODIFIERS = [
+  { id: 'critic',
+    title: 'Critic Customers',  icon: '🧐',
+    desc: 'Only PERFECT pours accepted.\nGood pours count as wrong orders!' },
+  { id: 'hardTimer',
+    title: 'Hard-Timer VIPs',   icon: '⏱',
+    desc: 'VIP customers have a fixed 4-second\ntimer. Patience upgrades won\'t help them.' },
+  { id: 'waveSpawn',
+    title: 'Wave Spawn',         icon: '🌊',
+    desc: 'The queue floods instantly and\nrefills the moment a slot opens.' },
+  { id: 'comboKiller',
+    title: 'Combo Killer',       icon: '💀',
+    desc: 'Wrong drinks and spills cost an\nextra heart on top of breaking your combo.' },
+  { id: 'speedMalfunction',
+    title: 'Speed Malfunction',  icon: '⚡',
+    desc: 'All machines pour at 2× speed.\nTiming is everything.' },
+  { id: 'movingTarget',
+    title: 'Moving Target',      icon: '🎯',
+    desc: 'The green zone drifts while you pour.\nFollow it — don\'t pour from memory.' },
+  { id: 'noSpill',
+    title: 'No-Spill Inspector', icon: '🔍',
+    desc: 'A health inspector is watching.\nAny spill costs 2 hearts instead of 1.' },
+];
+
 // ---- Customer quips ---------------------------------------------------------
 // Shown above a customer's head when their patience bar runs low, and as a
 // floating aside when they walk out, get the wrong drink, or get spilled on.
@@ -199,6 +228,12 @@ class GameScene extends Phaser.Scene {
     // Cosmetic one-time perks (walls/makers/decor) are NOT tracked here.
     this.abilityLevels = { patience: 0, combo: 0, heart: 0, feet: 0 };
 
+    this.rushModifiers = [];
+    this.zoneOffset = 0;
+    this.rushOverlayObjs = [];
+    this._pendingRushModifiers = null;
+    this._rushShakeTimer = null;
+
     // Per-machine selection for the Store's "Machines" tab.
     this.storeMachineIndex = 0;
 
@@ -261,16 +296,30 @@ class GameScene extends Phaser.Scene {
     };
   }
 
+  isRushLevel(n) { return n > 0 && n % 10 === 0; }
+
+  selectRushModifiers(n) {
+    const count = Math.min(Math.floor(n / 10), RUSH_MODIFIERS.length);
+    return Phaser.Utils.Array.Shuffle(RUSH_MODIFIERS.slice()).slice(0, count).map((m) => m.id);
+  }
+
   startLevel(n, skipBest) {
     this.level = n;
     if (!skipBest && n > Save.data.bestLevel) { Save.data.bestLevel = n; Save.write(); }
     this.cfg = this.levelConfig(n);
+    this.rushModifiers = this.isRushLevel(n)
+      ? (this._pendingRushModifiers || this.selectRushModifiers(n))
+      : [];
+    this._pendingRushModifiers = null;
+    this.zoneOffset = 0;
+    this.destroyRushOverlay();
     this.served = 0;
     this.state = 'playing';
     STATIONS.forEach((st) => { if (n >= st.unlock && !st.revealed) this.revealStation(st); });
     this.updateLevelUI();
     this.updateHearts();
-    this.showBanner('LEVEL ' + n, '#ffe082', 'Serve ' + this.cfg.quota + ' drinks');
+    if (this.rushModifiers.length) this.buildRushOverlay();
+    this.showBanner('LEVEL ' + n, this.rushModifiers.length ? '#e5564d' : '#ffe082', 'Serve ' + this.cfg.quota + ' drinks');
     if (n === 1) {
       this.time.delayedCall(1000, () => this.showTutorialOnce('l1Welcome',
         GW / 2, COUNTER_TOP - 150,
@@ -314,7 +363,11 @@ class GameScene extends Phaser.Scene {
       ));
     }
     this.scheduleSpawn();
-    this.spawnCustomer();
+    if (this.rushModifiers.includes('waveSpawn')) {
+      for (let i = 0; i < this.cfg.maxQueue; i++) this.spawnCustomer();
+    } else {
+      this.spawnCustomer();
+    }
   }
 
   // Dev-mode only: cleanly tear down the in-progress level and jump to `n`,
@@ -332,6 +385,7 @@ class GameScene extends Phaser.Scene {
 
   completeLevel() {
     this.state = 'levelComplete';
+    this.destroyRushOverlay();
     this.cancelPour();
     if (this.spawnTimer) this.spawnTimer.remove();
     // Politely clear anyone still waiting (no penalty).
@@ -351,6 +405,7 @@ class GameScene extends Phaser.Scene {
 
   gameOver() {
     this.state = 'gameOver';
+    this.destroyRushOverlay();
     this.cancelPour();
     if (this.spawnTimer) this.spawnTimer.remove();
     this.customers.slice().forEach((c) => this.sendOff(c, false));
@@ -621,9 +676,10 @@ class GameScene extends Phaser.Scene {
     // the others dimmed (done steps dimmest).
     const order = this.activeOrder();
     if (order) {
+      const zo = this.zoneOffset || 0;
       order.steps.forEach((s, i) => {
-        const yTop = CUP.innerBottom - s.band[1] * CUP.innerH;
-        const yBot = CUP.innerBottom - s.band[0] * CUP.innerH;
+        const yTop = CUP.innerBottom - (s.band[1] + zo) * CUP.innerH;
+        const yBot = CUP.innerBottom - (s.band[0] + zo) * CUP.innerH;
         const cur = i === this.stepIndex;
         g.fillStyle(COL.zone, cur ? 0.30 : i < this.stepIndex ? 0.05 : 0.13);
         g.fillRect(innerLeft, yTop, innerW, yBot - yTop);
@@ -821,9 +877,14 @@ class GameScene extends Phaser.Scene {
 
     if (this.state !== 'playing') return;
 
+    this.zoneOffset = this.rushModifiers.includes('movingTarget')
+      ? Math.sin(time / RUSH_ZONE_DRIFT_SPEED) * RUSH_ZONE_DRIFT_AMT
+      : 0;
+
     if (this.pouring && !this.serving) {
       const activeSt = this.activeStation();
-      this.fill += (activeSt.pourSpeed + activeSt.pourLevel * STATION_UPGRADES.pour.amt) * dt;
+      const speedMult = this.rushModifiers.includes('speedMalfunction') ? 2 : 1;
+      this.fill += (activeSt.pourSpeed + activeSt.pourLevel * STATION_UPGRADES.pour.amt) * speedMult * dt;
       const liqTop = CUP.innerBottom - this.fill * CUP.innerH;
       this.splash.setParticleTint(this.brewColor());
       this.splash.setPosition(this.cupX(), Math.max(CUP.innerTop, liqTop));
@@ -887,7 +948,8 @@ class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: st.machine, scaleX: 6.25, duration: 90, yoyo: true });
     }
 
-    this.fill += (st.pourSpeed + st.pourLevel * STATION_UPGRADES.pour.amt + emp.pourLevel * EMPLOYEE_POUR_UPGRADE.amt) * dt;
+    const speedMult = this.rushModifiers.includes('speedMalfunction') ? 2 : 1;
+    this.fill += (st.pourSpeed + st.pourLevel * STATION_UPGRADES.pour.amt + emp.pourLevel * EMPLOYEE_POUR_UPGRADE.amt) * speedMult * dt;
     const liqTop = CUP.innerBottom - this.fill * CUP.innerH;
     this.splash.setParticleTint(step.color);
     this.splash.setPosition(st.x, Math.max(CUP.innerTop, liqTop));
@@ -905,7 +967,8 @@ class GameScene extends Phaser.Scene {
   // Customers
   // ===========================================================================
   scheduleSpawn() {
-    this.spawnTimer = this.time.delayedCall(this.cfg.spawnInterval, () => {
+    const interval = this.rushModifiers.includes('waveSpawn') ? 200 : this.cfg.spawnInterval;
+    this.spawnTimer = this.time.delayedCall(interval, () => {
       if (this.state === 'playing' && this.customers.length < this.cfg.maxQueue) this.spawnCustomer();
       if (this.state === 'playing') this.scheduleSpawn();
     });
@@ -921,7 +984,10 @@ class GameScene extends Phaser.Scene {
     });
     const order = { name: drink.name, letter: drink.letter, mult: drink.mult, steps };
     // Two-step drinks mean an extra station trip — those customers wait longer.
-    const patience = this.cfg.patience + this.patienceBonus + (steps.length > 1 ? 5 : 0);
+    const isVIP = this.rushModifiers.includes('hardTimer') && Math.random() < 0.45;
+    const patience = isVIP
+      ? RUSH_HARD_TIMER_PATIENCE
+      : this.cfg.patience + this.patienceBonus + (steps.length > 1 ? 5 : 0);
 
     const container = this.add.container(GW + 60, FLOOR_Y).setDepth(8);
     const shadow = this.add.image(0, -2, 'softshadow').setScale(1.0, 0.3).setAlpha(0.35);
@@ -950,6 +1016,16 @@ class GameScene extends Phaser.Scene {
     const barBg = this.add.rectangle(0, -150, 60, 8, 0x2a2030).setOrigin(0.5);
     const barFill = this.add.rectangle(-28, -150, 56, 5, 0x6abf5a).setOrigin(0, 0.5);
     container.add([shadow, sprite, bubble, barBg, barFill]);
+
+    if (isVIP) {
+      sprite.setTint(0xffe566);
+      barFill.fillColor = 0xe5564d;
+      const vipTag = this.add.text(0, -174, '⏱ VIP', {
+        fontFamily: 'monospace', fontSize: FS(10), color: '#e5564d', fontStyle: 'bold',
+        stroke: '#2a2030', strokeThickness: 2,
+      }).setOrigin(0.5);
+      container.add(vipTag);
+    }
 
     const c = {
       container, sprite, bubble, barBg, barFill, order, variant, drawBubbleBg,
@@ -1004,9 +1080,14 @@ class GameScene extends Phaser.Scene {
     if (station.type !== step.station) quality = 'wrong';
     else if (this.spilled) quality = 'spill';
     else if (this.stepIndex < o.steps.length - 1) quality = 'poor'; // unfinished sequence
-    else if (this.fill >= step.band[0] && this.fill <= step.band[1]) quality = 'perfect';
-    else if (Math.abs(this.fill - step.target) <= step.tol * 2.2) quality = 'good';
-    else quality = 'poor';
+    else {
+      const zo = this.zoneOffset || 0;
+      const lo = step.band[0] + zo, hi = step.band[1] + zo;
+      if (this.fill >= lo && this.fill <= hi) quality = 'perfect';
+      else if (Math.abs(this.fill - (step.target + zo)) <= step.tol * 2.2) quality = 'good';
+      else quality = 'poor';
+    }
+    if (this.rushModifiers.includes('critic') && quality === 'good') quality = 'poor';
 
     if (quality === 'perfect' || quality === 'good') this.streak++;
     else this.streak = 0;
@@ -1063,7 +1144,10 @@ class GameScene extends Phaser.Scene {
       this.updateLevelUI();
       if (this.served >= this.cfg.quota) { this.completeLevel(); return; }
     } else if (quality === 'wrong' || quality === 'spill') {
-      this.loseLife(c.container.x);
+      let lives = 1;
+      if (quality === 'spill' && this.rushModifiers.includes('noSpill')) lives++;
+      if (this.rushModifiers.includes('comboKiller')) lives++;
+      this.loseLife(c.container.x, lives);
     }
   }
 
@@ -1080,9 +1164,9 @@ class GameScene extends Phaser.Scene {
     this.loseLife(c.container.x);
   }
 
-  loseLife(x) {
+  loseLife(x, amt = 1) {
     if (this.state !== 'playing') return;
-    this.lives--;
+    this.lives -= amt;
     this.updateHearts();
     SFX.buzz();
     this.cameras.main.shake(180, 0.008);
@@ -1289,7 +1373,7 @@ class GameScene extends Phaser.Scene {
     const sbg = this.add.graphics();
     sbg.fillStyle(0x4a3a6a, 1); sbg.fillRoundedRect(-54, -16, 108, 32, 8);
     sbg.lineStyle(2, 0xb9a6e0, 1); sbg.strokeRoundedRect(-54, -16, 108, 32, 8);
-    const slabel = this.add.text(0, 0, '🛍 STORE / PAUSE', {
+    const slabel = this.add.text(0, 0, '🛍 STORE/PAUSE', {
       fontFamily: 'monospace', fontSize: FS(14), color: '#f4efe6', fontStyle: 'bold',
     }).setOrigin(0.5);
     this.storeBtn.add([sbg, slabel]);
@@ -1469,7 +1553,12 @@ class GameScene extends Phaser.Scene {
         if (card.perk) { this.applyPerk(card.perk); this.abilityLevels[card.perk.stat]++; }
         else card.apply();
         overlay.forEach((o) => o.destroy());
-        this.startLevel(this.level + 1);
+        const nextLevel = this.level + 1;
+        if (this.isRushLevel(nextLevel)) {
+          this.showRushHourAnnouncement(nextLevel, () => this.startLevel(nextLevel));
+        } else {
+          this.startLevel(nextLevel);
+        }
       });
       overlay.push(cont);
       overlay.push(perkHit);
@@ -1507,6 +1596,142 @@ class GameScene extends Phaser.Scene {
       });
       x += cw + gap;
     });
+  }
+
+  showRushHourAnnouncement(nextLevel, onStart) {
+    const mods = this.selectRushModifiers(nextLevel);
+    this._pendingRushModifiers = mods;
+
+    this.cameras.main.shake(280, 0.012);
+    this.cameras.main.flash(350, 140, 10, 10);
+
+    const o = [];
+    o.push(this.add.rectangle(GW / 2, GH / 2, GW, GH, 0x1a0808, 0.92).setDepth(200).setInteractive());
+
+    // Pulsing red border
+    const bw = 5, bCol = 0xe5564d;
+    [[GW / 2, bw / 2, GW, bw], [GW / 2, GH - bw / 2, GW, bw],
+     [bw / 2, GH / 2, bw, GH], [GW - bw / 2, GH / 2, bw, GH]].forEach(([x, y, w, h]) => {
+      const r = this.add.rectangle(x, y, w, h, bCol).setDepth(201).setAlpha(0.9);
+      this.tweens.add({ targets: r, alpha: 0.2, duration: 500, yoyo: true, repeat: -1 });
+      o.push(r);
+    });
+
+    const title = this.add.text(GW / 2, 82, '⚠  RUSH HOUR  ⚠', {
+      fontFamily: 'monospace', fontSize: FS(40), color: '#e5564d', fontStyle: 'bold',
+      stroke: '#2a2030', strokeThickness: 6,
+    }).setOrigin(0.5).setDepth(202).setScale(0.4).setAlpha(0);
+    this.tweens.add({ targets: title, scale: 1, alpha: 1, duration: 360, ease: 'Back.out' });
+    o.push(title);
+
+    const subText = this.add.text(GW / 2, 136,
+      'LEVEL ' + nextLevel + '  —  ' + mods.length + ' MODIFIER' + (mods.length > 1 ? 'S' : '') + ' ACTIVE', {
+      fontFamily: 'monospace', fontSize: FS(17), color: '#e09a4f', fontStyle: 'bold',
+      stroke: '#2a2030', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(202).setAlpha(0);
+    this.tweens.add({ targets: subText, alpha: 1, duration: 300, delay: 120 });
+    o.push(subText);
+
+    const modDefs = mods.map((id) => RUSH_MODIFIERS.find((m) => m.id === id));
+    const cols = Math.min(modDefs.length, 4);
+    const cardW = Math.min(178, (GW - 60) / cols - 14);
+    const cardH = 172;
+    const gap = 14;
+    const totalW = cols * cardW + (cols - 1) * gap;
+    let mx = GW / 2 - totalW / 2 + cardW / 2;
+
+    modDefs.forEach((mod, i) => {
+      const rowY = modDefs.length > 4 ? (i < 4 ? 288 : 478) : 308;
+      const cont = this.add.container(mx, rowY).setDepth(202).setAlpha(0).setScale(0.7);
+      const bg2 = this.add.graphics();
+      bg2.fillStyle(0x3a1010, 1);
+      bg2.fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 10);
+      bg2.lineStyle(2, 0xe5564d, 0.9);
+      bg2.strokeRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 10);
+      const iconT = this.add.text(0, -cardH / 2 + 26, mod.icon, { fontSize: FS(28) }).setOrigin(0.5);
+      const nameT = this.add.text(0, -cardH / 2 + 60, mod.title, {
+        fontFamily: 'monospace', fontSize: FS(13), color: '#f4efe6', fontStyle: 'bold',
+        align: 'center', wordWrap: { width: cardW - 12 },
+      }).setOrigin(0.5);
+      const descT = this.add.text(0, cardH / 2 - 40, mod.desc, {
+        fontFamily: 'monospace', fontSize: FS(10), color: '#c9c0d0',
+        align: 'center', wordWrap: { width: cardW - 12 },
+      }).setOrigin(0.5);
+      cont.add([bg2, iconT, nameT, descT]);
+      this.tweens.add({ targets: cont, alpha: 1, scale: 1, duration: 300, ease: 'Back.out', delay: 180 + (i % 4) * 90 });
+      o.push(cont);
+      if ((i + 1) % 4 === 0) mx = GW / 2 - totalW / 2 + cardW / 2;
+      else mx += cardW + gap;
+    });
+
+    const btnY = GH - 68;
+    const btnCont = this.add.container(GW / 2, btnY).setDepth(202).setAlpha(0);
+    const btnBg2 = this.add.graphics();
+    btnBg2.fillStyle(0x6a1a1a, 1);
+    btnBg2.fillRoundedRect(-130, -26, 260, 52, 10);
+    btnBg2.lineStyle(3, 0xe5564d, 1);
+    btnBg2.strokeRoundedRect(-130, -26, 260, 52, 10);
+    const btnLabel2 = this.add.text(0, 0, 'BRACE YOURSELF', {
+      fontFamily: 'monospace', fontSize: FS(21), color: '#fff', fontStyle: 'bold',
+    }).setOrigin(0.5);
+    btnCont.add([btnBg2, btnLabel2]);
+    this.tweens.add({ targets: btnCont, alpha: 1, duration: 320, delay: 450 });
+    o.push(btnCont);
+
+    const btnHit = this.add.rectangle(GW / 2, btnY, 260, 52).setDepth(203)
+      .setInteractive({ useHandCursor: true });
+    btnHit.on('pointerover', () => this.tweens.add({ targets: btnCont, scale: 1.06, duration: 80 }));
+    btnHit.on('pointerout',  () => this.tweens.add({ targets: btnCont, scale: 1,    duration: 80 }));
+    btnHit.on('pointerdown', () => {
+      SFX.buzz();
+      this.cameras.main.shake(180, 0.01);
+      btnHit.destroy();
+      o.forEach((obj) => obj.destroy());
+      onStart();
+    });
+    o.push(btnHit);
+  }
+
+  buildRushOverlay() {
+    this.destroyRushOverlay();
+    this.rushOverlayObjs = [];
+
+    const bw = 6, col = 0xe5564d;
+    [[GW / 2, bw / 2, GW, bw], [GW / 2, GH - bw / 2, GW, bw],
+     [bw / 2, GH / 2, bw, GH], [GW - bw / 2, GH / 2, bw, GH]].forEach(([x, y, w, h]) => {
+      const r = this.add.rectangle(x, y, w, h, col).setDepth(95).setAlpha(0.6);
+      this.tweens.add({ targets: r, alpha: 0.12, duration: 800, yoyo: true, repeat: -1 });
+      this.rushOverlayObjs.push(r);
+    });
+
+    const label = this.add.text(12, 116, '⚠ RUSH HOUR', {
+      fontFamily: 'monospace', fontSize: FS(13), color: '#e5564d', fontStyle: 'bold',
+      stroke: '#2a2030', strokeThickness: 3,
+    }).setDepth(100);
+    this.tweens.add({ targets: label, alpha: 0.35, duration: 800, yoyo: true, repeat: -1 });
+    this.rushOverlayObjs.push(label);
+
+    this.rushModifiers.forEach((id, i) => {
+      const mod = RUSH_MODIFIERS.find((m) => m.id === id);
+      if (!mod) return;
+      const t = this.add.text(12, 134 + i * 16, mod.icon + ' ' + mod.title, {
+        fontFamily: 'monospace', fontSize: FS(11), color: '#e09a4f',
+        stroke: '#2a2030', strokeThickness: 2,
+      }).setDepth(100).setAlpha(0.85);
+      this.rushOverlayObjs.push(t);
+    });
+
+    this._rushShakeTimer = this.time.addEvent({
+      delay: 5500,
+      loop: true,
+      callback: () => { if (this.state === 'playing') this.cameras.main.shake(80, 0.003); },
+    });
+  }
+
+  destroyRushOverlay() {
+    (this.rushOverlayObjs || []).forEach((obj) => { if (obj && obj.destroy) obj.destroy(); });
+    this.rushOverlayObjs = [];
+    if (this._rushShakeTimer) { this._rushShakeTimer.remove(); this._rushShakeTimer = null; }
   }
 
   showGameOver() {
